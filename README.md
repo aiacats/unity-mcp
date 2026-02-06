@@ -28,7 +28,7 @@ A Unity Package Manager (UPM) package that enables [Claude Code](https://claude.
 
 1. Open Unity Package Manager (`Window > Package Manager`)
 2. Click `+` and select `Add package from git URL...`
-3. Enter: `https://github.com/YOUR_USERNAME/unity-mcp.git`
+3. Enter: `https://github.com/aiacats/unity-mcp.git`
 
 ### Via Package Manager Manifest
 
@@ -37,7 +37,7 @@ Add to your `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.komao.unity-mcp": "https://github.com/YOUR_USERNAME/unity-mcp.git"
+    "com.komao.unity-mcp": "https://github.com/aiacats/unity-mcp.git"
   }
 }
 ```
@@ -48,7 +48,7 @@ If you prefer to manage the package as a Git submodule:
 
 ```bash
 # Add as submodule
-git submodule add https://github.com/YOUR_USERNAME/unity-mcp.git Packages/com.komao.unity-mcp
+git submodule add https://github.com/aiacats/unity-mcp.git Packages/com.komao.unity-mcp
 
 # Initialize submodules (for cloned projects)
 git submodule update --init --recursive

@@ -31,11 +31,11 @@
     }
   ],
   "repository": {
-    "url": "https://github.com/YOUR_USERNAME/unity-mcp.git",
+    "url": "https://github.com/aiacats/unity-mcp.git",
     "type": "git",
     "revision": "main"
   },
   "license": "MIT",
-  "changelogUrl": "https://github.com/YOUR_USERNAME/unity-mcp/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/YOUR_USERNAME/unity-mcp/blob/main/LICENSE.md"
+  "changelogUrl": "https://github.com/aiacats/unity-mcp/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/aiacats/unity-mcp/blob/main/LICENSE.md"
 }
