@@ -1,0 +1,17 @@
+{
+  "name": "claude-code-mcp-unity-server",
+  "version": "1.0.0",
+  "description": "Node.js MCP server for Claude Code Unity integration",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "build": "mkdir -p build && cp index.js build/ && cp package.json build/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  },
+  "keywords": ["mcp", "unity", "claude-code"],
+  "author": "Claude Code",
+  "license": "MIT"
+}
