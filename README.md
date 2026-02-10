@@ -36,9 +36,9 @@ Add to your `Packages/manifest.json`:
 
 ```json
 {
-  "dependencies": {
-    "com.komao.unity-mcp": "https://github.com/aiacats/unity-mcp.git"
-  }
+    "dependencies": {
+        "com.aiacats.unity-mcp": "https://github.com/aiacats/unity-mcp.git"
+    }
 }
 ```
 
@@ -89,17 +89,15 @@ Create a `.mcp.json` file in your project root:
 
 ```json
 {
-  "mcpServers": {
-    "claude-code-mcp-unity": {
-      "command": "node",
-      "args": [
-        "Packages/com.komao.unity-mcp/Server/index.js"
-      ],
-      "env": {
-        "MCP_UNITY_HTTP_URL": "http://localhost:8090"
-      }
+    "mcpServers": {
+        "claude-code-mcp-unity": {
+            "command": "node",
+            "args": ["Packages/com.komao.unity-mcp/Server/index.js"],
+            "env": {
+                "MCP_UNITY_HTTP_URL": "http://localhost:8090"
+            }
+        }
     }
-  }
 }
 ```
 
@@ -109,20 +107,22 @@ Create a `.mcp.json` file in your project root:
 
 Once installed, Claude Code can control Unity using natural language:
 
-- *"Create a new GameObject named 'Player' in the scene"*
-- *"Add a Rigidbody component to the selected GameObject"*
-- *"Show me the current scene hierarchy"*
-- *"Check for compilation errors"*
-- *"Trigger a hot reload"*
+- _"Create a new GameObject named 'Player' in the scene"_
+- _"Add a Rigidbody component to the selected GameObject"_
+- _"Show me the current scene hierarchy"_
+- _"Check for compilation errors"_
+- _"Trigger a hot reload"_
 
 ### Available Tools
 
 #### GameObject Manipulation
+
 - **select_gameobject**: Select objects in hierarchy
 - **update_gameobject**: Modify GameObject properties
 - **update_component**: Add/modify components
 
 #### Development Workflow
+
 - **send_console_log**: Send messages to Unity Console
 - **get_console_logs**: Retrieve console messages
 - **hot_reload**: Trigger script recompilation
@@ -130,11 +130,13 @@ Once installed, Claude Code can control Unity using natural language:
 - **get_compilation_errors**: Get build errors and warnings
 
 #### Scene & Asset Management
+
 - **execute_menu_item**: Run Unity menu commands
 - **add_package**: Install packages via Package Manager
 - **add_asset_to_scene**: Instantiate prefabs and assets
 
 #### Monitoring & Debugging
+
 - **check_compilation_status**: Get real-time compilation status
 - **Scene Hierarchy Resource**: Access complete scene structure
 
