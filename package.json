@@ -1,5 +1,5 @@
 {
-    "name": "com.komao.unity-mcp",
+    "name": "com.aiacats.unity-mcp",
     "version": "1.0.0",
     "displayName": "Unity MCP Bridge for Claude Code",
     "description": "Model Context Protocol (MCP) server integration for Unity Editor, enabling Claude Code to directly control Unity through HTTP API and Node.js bridge.",
