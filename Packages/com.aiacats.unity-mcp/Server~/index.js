@@ -376,6 +376,163 @@ class ClaudeCodeMCPUnityServer {
               },
               required: ['componentName']
             }
+          },
+          {
+            name: 'get_gameobject_info',
+            description: 'Gets detailed information about a GameObject including Transform, components list, hierarchy info, and properties.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectPath: {
+                  type: 'string',
+                  description: 'The path or name of the GameObject (e.g. "Main Camera")'
+                },
+                instanceId: {
+                  type: 'number',
+                  description: 'The instance ID of the GameObject'
+                }
+              }
+            }
+          },
+          {
+            name: 'get_component_properties',
+            description: 'Gets all serialized property values of a specific component on a GameObject.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectPath: {
+                  type: 'string',
+                  description: 'The path or name of the GameObject (e.g. "Main Camera")'
+                },
+                instanceId: {
+                  type: 'number',
+                  description: 'The instance ID of the GameObject'
+                },
+                componentName: {
+                  type: 'string',
+                  description: 'The name of the component to inspect (e.g. "Camera", "Rigidbody", "Transform")'
+                }
+              },
+              required: ['componentName']
+            }
+          },
+          {
+            name: 'save_scene',
+            description: 'Saves the currently active scene.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'open_scene',
+            description: 'Opens a scene by its asset path.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                scenePath: {
+                  type: 'string',
+                  description: 'The asset path of the scene to open (e.g. "Assets/Scenes/MainScene.unity")'
+                },
+                additive: {
+                  type: 'boolean',
+                  description: 'Whether to open the scene additively (keeping current scene loaded). Default: false'
+                }
+              },
+              required: ['scenePath']
+            }
+          },
+          {
+            name: 'play_mode_control',
+            description: 'Controls Unity Editor play mode (play, stop, pause) or gets current status.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  enum: ['play', 'stop', 'pause', 'status'],
+                  description: 'The action to perform: play, stop, pause (toggle), or status'
+                }
+              },
+              required: ['action']
+            }
+          },
+          {
+            name: 'find_assets',
+            description: 'Searches the AssetDatabase for assets matching a filter. Uses Unity AssetDatabase.FindAssets syntax.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filter: {
+                  type: 'string',
+                  description: 'Search filter string (e.g. "Player", "t:Material wood")'
+                },
+                type: {
+                  type: 'string',
+                  description: 'Asset type filter (e.g. "Material", "Prefab", "Scene", "Texture2D", "Script")'
+                },
+                searchInFolder: {
+                  type: 'string',
+                  description: 'Limit search to a specific folder (e.g. "Assets/Prefabs")'
+                },
+                limit: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 200,
+                  description: 'Maximum number of results to return (default: 50)'
+                }
+              }
+            }
+          },
+          {
+            name: 'create_material',
+            description: 'Creates a new Material asset with the specified shader and color.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  description: 'Name for the material (default: "New Material")'
+                },
+                shader: {
+                  type: 'string',
+                  description: 'Shader name (e.g. "Standard", "Universal Render Pipeline/Lit", "Unlit/Color"). Default: "Standard"'
+                },
+                savePath: {
+                  type: 'string',
+                  description: 'Asset path to save the material (e.g. "Assets/Materials/MyMaterial.mat"). Default: "Assets/{name}.mat"'
+                },
+                color: {
+                  type: 'object',
+                  description: 'Main color for the material (RGBA, 0-1 range)',
+                  properties: {
+                    r: { type: 'number', description: 'Red (0-1)' },
+                    g: { type: 'number', description: 'Green (0-1)' },
+                    b: { type: 'number', description: 'Blue (0-1)' },
+                    a: { type: 'number', description: 'Alpha (0-1, default: 1)' }
+                  }
+                }
+              }
+            }
+          },
+          {
+            name: 'screenshot',
+            description: 'Captures a screenshot from the Game view.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                savePath: {
+                  type: 'string',
+                  description: 'Path to save the screenshot (e.g. "Assets/Screenshots/shot.png"). Default: auto-generated with timestamp'
+                },
+                superSize: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 8,
+                  description: 'Resolution multiplier (1 = normal, 2 = double, etc.). Default: 1'
+                }
+              }
+            }
           }
         ]
       };

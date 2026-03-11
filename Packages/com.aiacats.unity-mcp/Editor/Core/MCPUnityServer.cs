@@ -652,12 +652,36 @@ namespace ClaudeCodeMCP.Editor.Core
                     case "/mcp/tools/add_asset_to_scene":
                         return HandleAddAssetToScene(requestBody);
                     
+                    case "/mcp/tools/get_gameobject_info":
+                        return HandleGetGameObjectInfo(requestBody);
+
+                    case "/mcp/tools/get_component_properties":
+                        return HandleGetComponentProperties(requestBody);
+
+                    case "/mcp/tools/save_scene":
+                        return HandleSaveScene(requestBody);
+
+                    case "/mcp/tools/open_scene":
+                        return HandleOpenScene(requestBody);
+
+                    case "/mcp/tools/play_mode_control":
+                        return HandlePlayModeControl(requestBody);
+
+                    case "/mcp/tools/find_assets":
+                        return HandleFindAssets(requestBody);
+
+                    case "/mcp/tools/create_material":
+                        return HandleCreateMaterial(requestBody);
+
+                    case "/mcp/tools/screenshot":
+                        return HandleScreenshot(requestBody);
+
                     case "/mcp/resources/scenes_hierarchy":
                         return HandleGetScenesHierarchy();
-                    
+
                     case "/mcp/ping":
                         return CreateSuccessResponse("pong", "Claude Code MCP Server is running");
-                    
+
                     default:
                         return CreateErrorResponse("unknown_endpoint", $"Unknown endpoint: {path}");
                 }
@@ -949,6 +973,529 @@ namespace ClaudeCodeMCP.Editor.Core
                 catch (Exception ex)
                 {
                     return CreateErrorResponse("remove_component_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleGetGameObjectInfo(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string objectPath = request["objectPath"]?.ToString();
+                    int? instanceId = request["instanceId"]?.ToObject<int?>();
+
+                    GameObject target = null;
+
+                    if (instanceId.HasValue)
+                    {
+                        target = EditorUtility.InstanceIDToObject(instanceId.Value) as GameObject;
+                    }
+                    else if (!string.IsNullOrEmpty(objectPath))
+                    {
+                        target = GameObject.Find(objectPath);
+                    }
+
+                    if (target == null)
+                    {
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found");
+                    }
+
+                    var info = new JObject
+                    {
+                        ["name"] = target.name,
+                        ["instanceId"] = target.GetInstanceID(),
+                        ["isActive"] = target.activeSelf,
+                        ["isActiveInHierarchy"] = target.activeInHierarchy,
+                        ["tag"] = target.tag,
+                        ["layer"] = target.layer,
+                        ["layerName"] = LayerMask.LayerToName(target.layer),
+                        ["isStatic"] = target.isStatic
+                    };
+
+                    // Transform
+                    var transform = target.transform;
+                    info["transform"] = new JObject
+                    {
+                        ["position"] = new JObject { ["x"] = transform.position.x, ["y"] = transform.position.y, ["z"] = transform.position.z },
+                        ["localPosition"] = new JObject { ["x"] = transform.localPosition.x, ["y"] = transform.localPosition.y, ["z"] = transform.localPosition.z },
+                        ["rotation"] = new JObject { ["x"] = transform.eulerAngles.x, ["y"] = transform.eulerAngles.y, ["z"] = transform.eulerAngles.z },
+                        ["localRotation"] = new JObject { ["x"] = transform.localEulerAngles.x, ["y"] = transform.localEulerAngles.y, ["z"] = transform.localEulerAngles.z },
+                        ["localScale"] = new JObject { ["x"] = transform.localScale.x, ["y"] = transform.localScale.y, ["z"] = transform.localScale.z }
+                    };
+
+                    // Parent
+                    if (transform.parent != null)
+                    {
+                        info["parentName"] = transform.parent.name;
+                        info["parentInstanceId"] = transform.parent.gameObject.GetInstanceID();
+                    }
+
+                    // Children count
+                    info["childCount"] = transform.childCount;
+
+                    // Components
+                    var components = new JArray();
+                    foreach (var comp in target.GetComponents<Component>())
+                    {
+                        if (comp == null) continue;
+                        components.Add(new JObject
+                        {
+                            ["type"] = comp.GetType().Name,
+                            ["fullType"] = comp.GetType().FullName,
+                            ["instanceId"] = comp.GetInstanceID()
+                        });
+                    }
+                    info["components"] = components;
+
+                    return CreateSuccessResponse("gameobject_info", info);
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("get_gameobject_info_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleGetComponentProperties(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string objectPath = request["objectPath"]?.ToString();
+                    int? instanceId = request["instanceId"]?.ToObject<int?>();
+                    string componentName = request["componentName"]?.ToString();
+
+                    if (string.IsNullOrEmpty(componentName))
+                    {
+                        return CreateErrorResponse("missing_parameter", "componentName is required");
+                    }
+
+                    GameObject target = null;
+
+                    if (instanceId.HasValue)
+                    {
+                        target = EditorUtility.InstanceIDToObject(instanceId.Value) as GameObject;
+                    }
+                    else if (!string.IsNullOrEmpty(objectPath))
+                    {
+                        target = GameObject.Find(objectPath);
+                    }
+
+                    if (target == null)
+                    {
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found");
+                    }
+
+                    var componentType = System.Type.GetType($"UnityEngine.{componentName}, UnityEngine") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.CoreModule") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.PhysicsModule") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.Physics2DModule") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.UIModule") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.AnimationModule");
+
+                    if (componentType == null)
+                    {
+                        // Try to find by iterating components
+                        foreach (var comp in target.GetComponents<Component>())
+                        {
+                            if (comp != null && comp.GetType().Name == componentName)
+                            {
+                                componentType = comp.GetType();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (componentType == null)
+                    {
+                        return CreateErrorResponse("component_type_not_found", $"Component type not found: {componentName}");
+                    }
+
+                    var component = target.GetComponent(componentType);
+                    if (component == null)
+                    {
+                        return CreateErrorResponse("component_not_found", $"Component {componentName} not found on {target.name}");
+                    }
+
+                    var properties = new JObject();
+                    var serializedObject = new SerializedObject(component);
+                    var iterator = serializedObject.GetIterator();
+                    bool enterChildren = true;
+
+                    while (iterator.NextVisible(enterChildren))
+                    {
+                        enterChildren = false;
+                        try
+                        {
+                            var propName = iterator.name;
+                            if (propName == "m_Script") continue;
+
+                            switch (iterator.propertyType)
+                            {
+                                case SerializedPropertyType.Integer:
+                                    properties[propName] = iterator.intValue;
+                                    break;
+                                case SerializedPropertyType.Boolean:
+                                    properties[propName] = iterator.boolValue;
+                                    break;
+                                case SerializedPropertyType.Float:
+                                    properties[propName] = iterator.floatValue;
+                                    break;
+                                case SerializedPropertyType.String:
+                                    properties[propName] = iterator.stringValue;
+                                    break;
+                                case SerializedPropertyType.Enum:
+                                    properties[propName] = iterator.enumDisplayNames[iterator.enumValueIndex];
+                                    break;
+                                case SerializedPropertyType.Vector2:
+                                    var v2 = iterator.vector2Value;
+                                    properties[propName] = new JObject { ["x"] = v2.x, ["y"] = v2.y };
+                                    break;
+                                case SerializedPropertyType.Vector3:
+                                    var v3 = iterator.vector3Value;
+                                    properties[propName] = new JObject { ["x"] = v3.x, ["y"] = v3.y, ["z"] = v3.z };
+                                    break;
+                                case SerializedPropertyType.Vector4:
+                                    var v4 = iterator.vector4Value;
+                                    properties[propName] = new JObject { ["x"] = v4.x, ["y"] = v4.y, ["z"] = v4.z, ["w"] = v4.w };
+                                    break;
+                                case SerializedPropertyType.Color:
+                                    var color = iterator.colorValue;
+                                    properties[propName] = new JObject { ["r"] = color.r, ["g"] = color.g, ["b"] = color.b, ["a"] = color.a };
+                                    break;
+                                case SerializedPropertyType.Bounds:
+                                    var bounds = iterator.boundsValue;
+                                    properties[propName] = new JObject
+                                    {
+                                        ["center"] = new JObject { ["x"] = bounds.center.x, ["y"] = bounds.center.y, ["z"] = bounds.center.z },
+                                        ["size"] = new JObject { ["x"] = bounds.size.x, ["y"] = bounds.size.y, ["z"] = bounds.size.z }
+                                    };
+                                    break;
+                                case SerializedPropertyType.Rect:
+                                    var rect = iterator.rectValue;
+                                    properties[propName] = new JObject { ["x"] = rect.x, ["y"] = rect.y, ["width"] = rect.width, ["height"] = rect.height };
+                                    break;
+                                case SerializedPropertyType.ObjectReference:
+                                    if (iterator.objectReferenceValue != null)
+                                    {
+                                        properties[propName] = new JObject
+                                        {
+                                            ["name"] = iterator.objectReferenceValue.name,
+                                            ["type"] = iterator.objectReferenceValue.GetType().Name,
+                                            ["instanceId"] = iterator.objectReferenceValue.GetInstanceID()
+                                        };
+                                    }
+                                    else
+                                    {
+                                        properties[propName] = null;
+                                    }
+                                    break;
+                                default:
+                                    properties[propName] = $"({iterator.propertyType})";
+                                    break;
+                            }
+                        }
+                        catch
+                        {
+                            // Skip properties that can't be read
+                        }
+                    }
+
+                    serializedObject.Dispose();
+
+                    var result = new JObject
+                    {
+                        ["gameObject"] = target.name,
+                        ["componentType"] = componentType.Name,
+                        ["properties"] = properties
+                    };
+
+                    return CreateSuccessResponse("component_properties", result);
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("get_component_properties_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleSaveScene(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                    bool saved = UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+
+                    if (saved)
+                    {
+                        return CreateSuccessResponse("scene_saved", $"Saved scene: {scene.name} ({scene.path})");
+                    }
+                    else
+                    {
+                        return CreateErrorResponse("save_scene_failed", $"Failed to save scene: {scene.name}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("save_scene_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleOpenScene(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string scenePath = request["scenePath"]?.ToString();
+                    bool additive = request["additive"]?.ToObject<bool>() ?? false;
+
+                    if (string.IsNullOrEmpty(scenePath))
+                    {
+                        return CreateErrorResponse("missing_parameter", "scenePath is required");
+                    }
+
+                    // Prompt to save current scene if dirty
+                    var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                    if (currentScene.isDirty && !additive)
+                    {
+                        UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                    }
+
+                    var mode = additive
+                        ? UnityEditor.SceneManagement.OpenSceneMode.Additive
+                        : UnityEditor.SceneManagement.OpenSceneMode.Single;
+
+                    var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath, mode);
+
+                    return CreateSuccessResponse("scene_opened", $"Opened scene: {scene.name} ({scenePath})");
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("open_scene_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandlePlayModeControl(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string action = request["action"]?.ToString()?.ToLower();
+
+                    switch (action)
+                    {
+                        case "play":
+                            if (!EditorApplication.isPlaying)
+                            {
+                                EditorApplication.isPlaying = true;
+                            }
+                            return CreateSuccessResponse("play_mode", "Play mode started");
+
+                        case "stop":
+                            if (EditorApplication.isPlaying)
+                            {
+                                EditorApplication.isPlaying = false;
+                            }
+                            return CreateSuccessResponse("play_mode", "Play mode stopped");
+
+                        case "pause":
+                            EditorApplication.isPaused = !EditorApplication.isPaused;
+                            return CreateSuccessResponse("play_mode", $"Play mode paused: {EditorApplication.isPaused}");
+
+                        case "status":
+                            var status = new JObject
+                            {
+                                ["isPlaying"] = EditorApplication.isPlaying,
+                                ["isPaused"] = EditorApplication.isPaused,
+                                ["isCompiling"] = EditorApplication.isCompiling
+                            };
+                            return CreateSuccessResponse("play_mode_status", status);
+
+                        default:
+                            return CreateErrorResponse("invalid_action", "action must be one of: play, stop, pause, status");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("play_mode_control_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleFindAssets(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string searchFilter = request["filter"]?.ToString();
+                    string searchInFolder = request["searchInFolder"]?.ToString();
+                    string type = request["type"]?.ToString();
+                    int limit = request["limit"]?.ToObject<int>() ?? 50;
+
+                    if (string.IsNullOrEmpty(searchFilter) && string.IsNullOrEmpty(type))
+                    {
+                        return CreateErrorResponse("missing_parameter", "filter or type is required");
+                    }
+
+                    string filter = searchFilter ?? "";
+                    if (!string.IsNullOrEmpty(type))
+                    {
+                        filter = $"t:{type} {filter}".Trim();
+                    }
+
+                    string[] guids;
+                    if (!string.IsNullOrEmpty(searchInFolder))
+                    {
+                        guids = AssetDatabase.FindAssets(filter, new[] { searchInFolder });
+                    }
+                    else
+                    {
+                        guids = AssetDatabase.FindAssets(filter);
+                    }
+
+                    var assets = new JArray();
+                    int count = Math.Min(guids.Length, limit);
+                    for (int i = 0; i < count; i++)
+                    {
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guids[i]);
+                        var assetType = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
+                        assets.Add(new JObject
+                        {
+                            ["guid"] = guids[i],
+                            ["path"] = assetPath,
+                            ["type"] = assetType?.Name ?? "Unknown",
+                            ["name"] = System.IO.Path.GetFileNameWithoutExtension(assetPath)
+                        });
+                    }
+
+                    var result = new JObject
+                    {
+                        ["totalFound"] = guids.Length,
+                        ["returned"] = count,
+                        ["assets"] = assets
+                    };
+
+                    return CreateSuccessResponse("assets_found", result);
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("find_assets_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleCreateMaterial(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string materialName = request["name"]?.ToString() ?? "New Material";
+                    string shaderName = request["shader"]?.ToString() ?? "Standard";
+                    string savePath = request["savePath"]?.ToString();
+                    var colorData = request["color"] as JObject;
+
+                    var shader = Shader.Find(shaderName);
+                    if (shader == null)
+                    {
+                        return CreateErrorResponse("shader_not_found", $"Shader not found: {shaderName}");
+                    }
+
+                    var material = new Material(shader);
+                    material.name = materialName;
+
+                    if (colorData != null)
+                    {
+                        float r = colorData["r"]?.ToObject<float>() ?? 1f;
+                        float g = colorData["g"]?.ToObject<float>() ?? 1f;
+                        float b = colorData["b"]?.ToObject<float>() ?? 1f;
+                        float a = colorData["a"]?.ToObject<float>() ?? 1f;
+                        material.color = new Color(r, g, b, a);
+                    }
+
+                    if (string.IsNullOrEmpty(savePath))
+                    {
+                        savePath = $"Assets/{materialName}.mat";
+                    }
+
+                    // Ensure directory exists
+                    string directory = System.IO.Path.GetDirectoryName(savePath);
+                    if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+                    {
+                        System.IO.Directory.CreateDirectory(directory);
+                    }
+
+                    AssetDatabase.CreateAsset(material, savePath);
+                    AssetDatabase.SaveAssets();
+
+                    var result = new JObject
+                    {
+                        ["name"] = materialName,
+                        ["shader"] = shaderName,
+                        ["path"] = savePath,
+                        ["guid"] = AssetDatabase.AssetPathToGUID(savePath)
+                    };
+
+                    return CreateSuccessResponse("material_created", result);
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("create_material_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleScreenshot(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string savePath = request["savePath"]?.ToString();
+                    int superSize = request["superSize"]?.ToObject<int>() ?? 1;
+
+                    if (string.IsNullOrEmpty(savePath))
+                    {
+                        string directory = "Assets/Screenshots";
+                        if (!System.IO.Directory.Exists(directory))
+                        {
+                            System.IO.Directory.CreateDirectory(directory);
+                        }
+                        savePath = $"{directory}/Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                    }
+
+                    // Ensure directory exists
+                    string dir = System.IO.Path.GetDirectoryName(savePath);
+                    if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                    {
+                        System.IO.Directory.CreateDirectory(dir);
+                    }
+
+                    ScreenCapture.CaptureScreenshot(savePath, superSize);
+
+                    // Refresh so the screenshot appears in the project
+                    EditorApplication.delayCall += () => AssetDatabase.Refresh();
+
+                    var result = new JObject
+                    {
+                        ["path"] = savePath,
+                        ["superSize"] = superSize
+                    };
+
+                    return CreateSuccessResponse("screenshot_taken", result);
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("screenshot_error", ex.Message);
                 }
             });
         }
