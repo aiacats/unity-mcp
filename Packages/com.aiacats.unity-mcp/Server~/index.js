@@ -337,6 +337,45 @@ class ClaudeCodeMCPUnityServer {
               type: 'object',
               properties: {}
             }
+          },
+          {
+            name: 'delete_gameobject',
+            description: 'Deletes a GameObject from the Unity scene by path or instance ID. Supports undo.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectPath: {
+                  type: 'string',
+                  description: 'The path or name of the GameObject to delete (e.g. "Main Camera")'
+                },
+                instanceId: {
+                  type: 'number',
+                  description: 'The instance ID of the GameObject to delete'
+                }
+              }
+            }
+          },
+          {
+            name: 'remove_component',
+            description: 'Removes a component from a GameObject in the Unity scene. Supports undo.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectPath: {
+                  type: 'string',
+                  description: 'The path or name of the GameObject (e.g. "Main Camera")'
+                },
+                instanceId: {
+                  type: 'number',
+                  description: 'The instance ID of the GameObject'
+                },
+                componentName: {
+                  type: 'string',
+                  description: 'The name of the component to remove (e.g. "Rigidbody", "BoxCollider")'
+                }
+              },
+              required: ['componentName']
+            }
           }
         ]
       };

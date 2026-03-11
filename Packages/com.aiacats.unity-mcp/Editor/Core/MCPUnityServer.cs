@@ -637,6 +637,12 @@ namespace ClaudeCodeMCP.Editor.Core
                     case "/mcp/tools/check_compilation_status":
                         return HandleCheckCompilationStatus(requestBody);
                     
+                    case "/mcp/tools/delete_gameobject":
+                        return HandleDeleteGameObject(requestBody);
+
+                    case "/mcp/tools/remove_component":
+                        return HandleRemoveComponent(requestBody);
+
                     case "/mcp/tools/add_package":
                         return HandleAddPackage(requestBody);
                     
@@ -852,6 +858,99 @@ namespace ClaudeCodeMCP.Editor.Core
             {
                 return CreateErrorResponse("update_component_error", ex.Message);
             }
+        }
+
+        private string HandleDeleteGameObject(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string objectPath = request["objectPath"]?.ToString();
+                    int? instanceId = request["instanceId"]?.ToObject<int?>();
+
+                    GameObject target = null;
+
+                    if (instanceId.HasValue)
+                    {
+                        target = EditorUtility.InstanceIDToObject(instanceId.Value) as GameObject;
+                    }
+                    else if (!string.IsNullOrEmpty(objectPath))
+                    {
+                        target = GameObject.Find(objectPath);
+                    }
+
+                    if (target == null)
+                    {
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found");
+                    }
+
+                    string targetName = target.name;
+                    Undo.DestroyObjectImmediate(target);
+
+                    return CreateSuccessResponse("gameobject_deleted", $"Deleted GameObject: {targetName}");
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("delete_gameobject_error", ex.Message);
+                }
+            });
+        }
+
+        private string HandleRemoveComponent(string requestBody)
+        {
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string objectPath = request["objectPath"]?.ToString();
+                    int? instanceId = request["instanceId"]?.ToObject<int?>();
+                    string componentName = request["componentName"]?.ToString();
+
+                    if (string.IsNullOrEmpty(componentName))
+                    {
+                        return CreateErrorResponse("missing_parameter", "componentName is required");
+                    }
+
+                    GameObject target = null;
+
+                    if (instanceId.HasValue)
+                    {
+                        target = EditorUtility.InstanceIDToObject(instanceId.Value) as GameObject;
+                    }
+                    else if (!string.IsNullOrEmpty(objectPath))
+                    {
+                        target = GameObject.Find(objectPath);
+                    }
+
+                    if (target == null)
+                    {
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found");
+                    }
+
+                    var componentType = System.Type.GetType($"UnityEngine.{componentName}, UnityEngine") ??
+                                       System.Type.GetType($"UnityEngine.{componentName}, UnityEngine.CoreModule");
+
+                    if (componentType == null)
+                    {
+                        return CreateErrorResponse("component_type_not_found", $"Component type not found: {componentName}");
+                    }
+
+                    var component = target.GetComponent(componentType);
+                    if (component == null)
+                    {
+                        return CreateErrorResponse("component_not_found", $"Component {componentName} not found on {target.name}");
+                    }
+
+                    Undo.DestroyObjectImmediate(component);
+
+                    return CreateSuccessResponse("component_removed", $"Removed {componentName} from {target.name}");
+                }
+                catch (Exception ex)
+                {
+                    return CreateErrorResponse("remove_component_error", ex.Message);
+                }
+            });
         }
 
         private string HandleGetConsoleLogs(string requestBody)
