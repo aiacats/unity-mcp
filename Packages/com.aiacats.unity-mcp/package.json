@@ -36,6 +36,6 @@
         "revision": "main"
     },
     "license": "MIT",
-    "changelogUrl": "https://github.com/aiacats/unity-mcp/blob/main/CHANGELOG.md",
-    "licensesUrl": "https://github.com/aiacats/unity-mcp/blob/main/LICENSE.md"
+    "changelogUrl": "https://github.com/aiacats/unity-mcp/blob/main/Packages/com.aiacats.unity-mcp/CHANGELOG.md",
+    "licensesUrl": "https://github.com/aiacats/unity-mcp/blob/main/Packages/com.aiacats.unity-mcp/LICENSE.md"
 }

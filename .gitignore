@@ -1,5 +1,4 @@
 # Unity
-*.meta
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -9,8 +8,7 @@
 [Uu]ser[Ss]ettings/
 
 # Node.js
-Server/node_modules/
-node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,6 +29,9 @@ yarn-error.log*
 Thumbs.db
 *.swp
 *~
+
+# Unity package lock (auto-generated)
+Packages/packages-lock.json
 
 # Build output
 *.dll

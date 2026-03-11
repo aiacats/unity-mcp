@@ -28,7 +28,7 @@ A Unity Package Manager (UPM) package that enables [Claude Code](https://claude.
 
 1. Open Unity Package Manager (`Window > Package Manager`)
 2. Click `+` and select `Add package from git URL...`
-3. Enter: `https://github.com/aiacats/unity-mcp.git`
+3. Enter: `https://github.com/aiacats/unity-mcp.git?path=Packages/com.aiacats.unity-mcp`
 
 ### Via Package Manager Manifest
 
@@ -37,7 +37,7 @@ Add to your `Packages/manifest.json`:
 ```json
 {
     "dependencies": {
-        "com.aiacats.unity-mcp": "https://github.com/aiacats/unity-mcp.git"
+        "com.aiacats.unity-mcp": "https://github.com/aiacats/unity-mcp.git?path=Packages/com.aiacats.unity-mcp"
     }
 }
 ```
@@ -48,7 +48,7 @@ If you prefer to manage the package as a Git submodule:
 
 ```bash
 # Add as submodule
-git submodule add https://github.com/aiacats/unity-mcp.git Packages/com.komao.unity-mcp
+git submodule add https://github.com/aiacats/unity-mcp.git
 
 # Initialize submodules (for cloned projects)
 git submodule update --init --recursive
@@ -64,10 +64,10 @@ git submodule update --init --recursive
 
 ### 1. Install Node.js Dependencies
 
-Navigate to the `Server` directory and install dependencies:
+Navigate to the `Server~` directory and install dependencies:
 
 ```bash
-cd Packages/com.komao.unity-mcp/Server
+cd Packages/com.aiacats.unity-mcp/Server~
 npm install
 ```
 
@@ -92,7 +92,7 @@ Create a `.mcp.json` file in your project root:
     "mcpServers": {
         "claude-code-mcp-unity": {
             "command": "node",
-            "args": ["Packages/com.komao.unity-mcp/Server/index.js"],
+            "args": ["Packages/com.aiacats.unity-mcp/Server~/index.js"],
             "env": {
                 "MCP_UNITY_HTTP_URL": "http://localhost:8090"
             }
