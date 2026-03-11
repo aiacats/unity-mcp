@@ -118,26 +118,37 @@ Once installed, Claude Code can control Unity using natural language:
 #### GameObject Manipulation
 
 - **select_gameobject**: Select objects in hierarchy
-- **update_gameobject**: Modify GameObject properties
+- **get_gameobject_info**: Get detailed GameObject info (Transform, components, hierarchy)
+- **update_gameobject**: Modify GameObject properties (or create new)
+- **delete_gameobject**: Delete a GameObject from the scene
 - **update_component**: Add/modify components
-
-#### Development Workflow
-
-- **send_console_log**: Send messages to Unity Console
-- **get_console_logs**: Retrieve console messages
-- **hot_reload**: Trigger script recompilation
-- **force_compilation**: Force full compilation
-- **get_compilation_errors**: Get build errors and warnings
+- **get_component_properties**: Read all serialized properties of a component
+- **remove_component**: Remove a component from a GameObject
 
 #### Scene & Asset Management
 
+- **save_scene**: Save the active scene
+- **open_scene**: Open a scene by path (single or additive)
+- **find_assets**: Search AssetDatabase with filter, type, and folder
+- **add_asset_to_scene**: Instantiate prefabs and assets
+- **create_material**: Create Material assets with shader and color
 - **execute_menu_item**: Run Unity menu commands
 - **add_package**: Install packages via Package Manager
-- **add_asset_to_scene**: Instantiate prefabs and assets
+
+#### Development Workflow
+
+- **play_mode_control**: Play/Stop/Pause control and status query
+- **hot_reload**: Trigger script recompilation
+- **force_compilation**: Force full compilation
+- **screenshot**: Capture Game view screenshots
 
 #### Monitoring & Debugging
 
+- **send_console_log**: Send messages to Unity Console
+- **get_console_logs**: Retrieve console messages
 - **check_compilation_status**: Get real-time compilation status
+- **get_compilation_errors**: Get build errors and warnings
+- **run_tests**: Run Unity Test Runner tests
 - **Scene Hierarchy Resource**: Access complete scene structure
 
 ### Control Panel
