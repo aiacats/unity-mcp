@@ -2,7 +2,9 @@
     "name": "ClaudeCodeMCPEditor",
     "rootNamespace": "ClaudeCodeMCP.Editor",
     "references": [
-        "Unity.Nuget.Newtonsoft-Json"
+        "Unity.Nuget.Newtonsoft-Json",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
     ],
     "includePlatforms": [
         "Editor"

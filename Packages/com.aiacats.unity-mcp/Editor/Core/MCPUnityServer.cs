@@ -11,6 +11,7 @@ using UnityEditor.Compilation;
 using System.Collections.Generic;
 using System.Threading;
 using System.Linq;
+using UnityEditor.TestTools.TestRunner.Api;
 
 namespace ClaudeCodeMCP.Editor.Core
 {
@@ -1721,9 +1722,122 @@ namespace ClaudeCodeMCP.Editor.Core
             }
         }
 
+        // Test runner state
+        private static readonly object _testResultLock = new object();
+        private static JArray _lastTestResults = null;
+        private static bool _testsRunning = false;
+        private static string _testRunStatus = "idle";
+
         private string HandleRunTests(string requestBody)
         {
-            return CreateErrorResponse("not_implemented", "Test runner integration not implemented yet");
+            return ExecuteOnMainThreadWithResult(() => {
+                try
+                {
+                    var request = JObject.Parse(requestBody);
+                    string testMode = request["testMode"]?.ToString() ?? "EditMode";
+                    string testFilter = request["testFilter"]?.ToString();
+                    bool returnOnlyFailures = request["returnOnlyFailures"]?.ToObject<bool>() ?? true;
+                    bool returnWithLogs = request["returnWithLogs"]?.ToObject<bool>() ?? false;
+                    bool queryOnly = request["queryOnly"]?.ToObject<bool>() ?? false;
+
+                    // If queryOnly, return last test results
+                    if (queryOnly)
+                    {
+                        lock (_testResultLock)
+                        {
+                            var statusResult = new JObject
+                            {
+                                ["status"] = _testRunStatus,
+                                ["isRunning"] = _testsRunning
+                            };
+                            if (_lastTestResults != null)
+                            {
+                                statusResult["results"] = _lastTestResults;
+                                statusResult["totalCount"] = _lastTestResults.Count;
+                                int failCount = _lastTestResults.Count(r => r["result"]?.ToString() == "Failed");
+                                int passCount = _lastTestResults.Count(r => r["result"]?.ToString() == "Passed");
+                                statusResult["passedCount"] = passCount;
+                                statusResult["failedCount"] = failCount;
+                            }
+                            return CreateSuccessResponse("test_results", statusResult);
+                        }
+                    }
+
+                    if (_testsRunning)
+                    {
+                        return CreateErrorResponse("tests_already_running", "Tests are already running. Use queryOnly to check status.");
+                    }
+
+                    // Parse test mode
+                    TestMode mode;
+                    switch (testMode.ToLower())
+                    {
+                        case "playmode":
+                        case "play":
+                            mode = TestMode.PlayMode;
+                            break;
+                        case "editmode":
+                        case "edit":
+                        default:
+                            mode = TestMode.EditMode;
+                            break;
+                    }
+
+                    // Setup test runner
+                    var testRunnerApi = ScriptableObject.CreateInstance<TestRunnerApi>();
+                    var callbackHandler = ScriptableObject.CreateInstance<MCPTestRunCallback>();
+                    callbackHandler.Init(returnOnlyFailures, returnWithLogs);
+
+                    testRunnerApi.RegisterCallbacks(callbackHandler);
+
+                    lock (_testResultLock)
+                    {
+                        _lastTestResults = null;
+                        _testsRunning = true;
+                        _testRunStatus = "running";
+                    }
+
+                    // Build filter
+                    var filter = new Filter
+                    {
+                        testMode = mode
+                    };
+
+                    if (!string.IsNullOrEmpty(testFilter))
+                    {
+                        filter.testNames = new[] { testFilter };
+                    }
+
+                    testRunnerApi.Execute(new ExecutionSettings(filter));
+
+                    return CreateSuccessResponse("tests_started", new JObject
+                    {
+                        ["message"] = $"Tests started in {testMode} mode",
+                        ["testMode"] = testMode,
+                        ["filter"] = testFilter ?? "(all)",
+                        ["hint"] = "Use run_tests with queryOnly=true to check results"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    lock (_testResultLock)
+                    {
+                        _testsRunning = false;
+                        _testRunStatus = "error";
+                    }
+                    return CreateErrorResponse("run_tests_error", ex.Message);
+                }
+            });
+        }
+
+        internal static void OnTestRunCompleted(JArray results)
+        {
+            lock (_testResultLock)
+            {
+                _lastTestResults = results;
+                _testsRunning = false;
+                _testRunStatus = "completed";
+            }
         }
 
         private string HandleAddAssetToScene(string requestBody)

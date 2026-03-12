@@ -216,29 +216,34 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'run_tests',
-            description: 'Runs Unity\'s Test Runner tests',
+            description: 'Runs Unity Test Framework tests (EditMode or PlayMode). Tests run asynchronously - use queryOnly=true to poll for results after starting.',
             inputSchema: {
               type: 'object',
               properties: {
                 testMode: {
                   type: 'string',
+                  enum: ['EditMode', 'PlayMode'],
                   default: 'EditMode',
-                  description: 'The test mode to run (EditMode or PlayMode) - defaults to EditMode (optional)'
+                  description: 'The test mode to run (EditMode or PlayMode). Default: EditMode'
                 },
                 testFilter: {
                   type: 'string',
-                  default: '',
-                  description: 'The specific test filter to run (e.g. specific test name or class name, must include namespace) (optional)'
+                  description: 'Specific test name or class name to filter (must include namespace). Omit to run all tests.'
                 },
                 returnOnlyFailures: {
                   type: 'boolean',
                   default: true,
-                  description: 'Whether to show only failed tests in the results (optional)'
+                  description: 'Only include failed tests in results. Default: true'
                 },
                 returnWithLogs: {
                   type: 'boolean',
                   default: false,
-                  description: 'Whether to return the test logs in the results (optional)'
+                  description: 'Include test output logs in results. Default: false'
+                },
+                queryOnly: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'If true, do not start new tests - only return the last test run results and status.'
                 }
               }
             }
