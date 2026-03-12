@@ -14,6 +14,10 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
         {
             return ExecuteOnMainThread(() => {
                 var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+
+                if (string.IsNullOrEmpty(scene.path))
+                    return CreateErrorResponse("scene_not_saved", "Scene has no path. Save it manually first via File > Save Scene As.");
+
                 bool saved = UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
 
                 return saved
@@ -38,9 +42,9 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     return CreateErrorResponse("missing_parameter", "scenePath is required");
 
                 var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                if (currentScene.isDirty && !additive)
+                if (currentScene.isDirty && !additive && !string.IsNullOrEmpty(currentScene.path))
                 {
-                    UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                    UnityEditor.SceneManagement.EditorSceneManager.SaveScene(currentScene);
                 }
 
                 var mode = additive
