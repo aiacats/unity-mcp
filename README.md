@@ -174,6 +174,31 @@ Access the control panel via `Tools > Claude Code MCP > Control Panel`:
 - **Testing Tools**: Built-in connection and functionality tests
 - **Configuration**: Copy .mcp.json configuration to clipboard
 
+## Architecture
+
+```
+Editor/
+├── Core/
+│   ├── MCPHttpServer.cs        # HTTP server lifecycle & request routing
+│   ├── MCPTestRunCallback.cs   # Unity Test Framework callback
+│   └── Handlers/
+│       ├── IMCPHandler.cs      # Handler interface
+│       ├── HandlerBase.cs      # Shared utilities (GameObject lookup, response helpers)
+│       ├── GameObjectHandler.cs
+│       ├── ComponentHandler.cs
+│       ├── SceneHandler.cs
+│       ├── CompilationHandler.cs
+│       ├── ConsoleHandler.cs
+│       └── EditorHandler.cs
+├── UI/
+│   ├── ClaudeCodeMCPWindow.cs  # Editor control panel window
+│   └── ClaudeCodeMCPStatusBar.cs # Scene view status overlay
+├── MCPServerSetup.cs           # Menu items for setup & control
+└── ClaudeCodeMCPEditor.asmdef  # Assembly definition
+Server~/
+└── index.js                    # Node.js MCP server (hidden from Unity)
+```
+
 ## License
 
 This project is licensed under the MIT License.
