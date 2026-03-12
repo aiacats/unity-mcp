@@ -137,7 +137,6 @@ Once installed, Claude Code can control Unity using natural language:
 
 #### Development Workflow
 
-- **play_mode_control**: Play/Stop/Pause control and status query
 - **hot_reload**: Trigger script recompilation
 - **force_compilation**: Force full compilation
 - **screenshot**: Capture Game view screenshots

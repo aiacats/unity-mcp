@@ -448,21 +448,6 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
-            name: 'play_mode_control',
-            description: 'Controls Unity Editor play mode (play, stop, pause) or gets current status.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                action: {
-                  type: 'string',
-                  enum: ['play', 'stop', 'pause', 'status'],
-                  description: 'The action to perform: play, stop, pause (toggle), or status'
-                }
-              },
-              required: ['action']
-            }
-          },
-          {
             name: 'find_assets',
             description: 'Searches the AssetDatabase for assets matching a filter. Uses Unity AssetDatabase.FindAssets syntax.',
             inputSchema: {

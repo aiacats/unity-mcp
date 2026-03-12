@@ -167,7 +167,6 @@ namespace ClaudeCodeMCP.Editor.Core
 
             // Editor control
             _handlers["/mcp/tools/execute_menu_item"] = new ExecuteMenuItemHandler(this);
-            _handlers["/mcp/tools/play_mode_control"] = new PlayModeControlHandler(this);
             _handlers["/mcp/tools/add_package"] = new AddPackageHandler(this);
             _handlers["/mcp/tools/run_tests"] = new RunTestsHandler(this, TestRunState);
         }

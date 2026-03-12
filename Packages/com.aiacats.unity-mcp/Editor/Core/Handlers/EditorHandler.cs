@@ -45,41 +45,6 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
         }
     }
 
-    internal class PlayModeControlHandler : HandlerBase
-    {
-        public PlayModeControlHandler(MCPHttpServer server) : base(server) { }
-
-        public override string Handle(string requestBody)
-        {
-            return ExecuteOnMainThread(() => {
-                var request = JObject.Parse(requestBody);
-                string action = request["action"]?.ToString()?.ToLower();
-
-                switch (action)
-                {
-                    case "play":
-                        if (!EditorApplication.isPlaying) EditorApplication.isPlaying = true;
-                        return CreateSuccessResponse("play_mode", "Play mode started");
-                    case "stop":
-                        if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
-                        return CreateSuccessResponse("play_mode", "Play mode stopped");
-                    case "pause":
-                        EditorApplication.isPaused = !EditorApplication.isPaused;
-                        return CreateSuccessResponse("play_mode", $"Play mode paused: {EditorApplication.isPaused}");
-                    case "status":
-                        return CreateSuccessResponse("play_mode_status", new JObject
-                        {
-                            ["isPlaying"] = EditorApplication.isPlaying,
-                            ["isPaused"] = EditorApplication.isPaused,
-                            ["isCompiling"] = EditorApplication.isCompiling
-                        });
-                    default:
-                        return CreateErrorResponse("invalid_action", "action must be one of: play, stop, pause, status");
-                }
-            });
-        }
-    }
-
     internal class AddPackageHandler : HandlerBase
     {
         public AddPackageHandler(MCPHttpServer server) : base(server) { }

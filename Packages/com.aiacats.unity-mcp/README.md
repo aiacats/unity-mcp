@@ -69,7 +69,6 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 
 | ツール名 | 説明 | 主要パラメータ |
 |---------|------|--------------|
-| `play_mode_control` | Play/Stop/Pause 制御 | `action(play/stop/pause/status)` |
 | `hot_reload` | スクリプト再コンパイル | `saveAssets`, `optimized` |
 | `force_compilation` | 強制フルコンパイル | `forceUpdate` |
 | `screenshot` | Game ビューのスクリーンショット | `savePath`, `superSize` |
