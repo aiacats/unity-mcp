@@ -151,6 +151,20 @@ Once installed, Claude Code can control Unity using natural language:
 - **run_tests**: Run Unity Test Runner tests
 - **Scene Hierarchy Resource**: Access complete scene structure
 
+### Automated Development Flow (for Claude Code)
+
+When Claude Code implements code in a Unity project with this package, the following automated flow should be used:
+
+1. **Implement code** — Edit C# scripts via file operations
+2. **Compile** — Call `hot_reload` (or `force_compilation` for full rebuild)
+3. **Wait for compilation** — Poll `check_compilation_status` until complete (timeout: 5 minutes)
+4. **Check errors** — Call `get_compilation_errors`. If errors exist, fix and go back to step 1
+5. **Run tests** — Call `run_tests` with the appropriate `testMode` (EditMode / PlayMode)
+6. **Wait for results** — Poll `run_tests` with `queryOnly: true` until complete (timeout: 5 minutes)
+7. **Check results** — If tests fail, fix and go back to step 1
+
+> **Note:** Test code should be provided by the consuming project, not this package. The project should have its own test assemblies under `Assets/Tests/` (or similar) with appropriate `.asmdef` files referencing `UnityEngine.TestRunner` and `UnityEditor.TestRunner`.
+
 ### Control Panel
 
 Access the control panel via `Tools > Claude Code MCP > Control Panel`:
@@ -159,29 +173,6 @@ Access the control panel via `Tools > Claude Code MCP > Control Panel`:
 - **Server Controls**: Start/stop/restart MCP server
 - **Testing Tools**: Built-in connection and functionality tests
 - **Configuration**: Copy .mcp.json configuration to clipboard
-
-## Testing
-
-### Built-in Tests
-
-Use the Control Panel test buttons:
-
-1. **Ping Test**: Verify server connectivity
-2. **Console Log Test**: Test message sending
-3. **Scene Hierarchy Test**: Verify data retrieval
-4. **Hot Reload Test**: Test compilation triggers
-
-### Manual Testing
-
-```bash
-# Test server directly
-curl http://localhost:8090/mcp/ping
-
-# Send test message
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"message": "Test", "type": "info"}' \
-  http://localhost:8090/mcp/tools/send_console_log
-```
 
 ## License
 
