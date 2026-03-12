@@ -187,7 +187,7 @@ namespace ClaudeCodeMCP.Editor
                 
                 try
                 {
-                    var server = ClaudeCodeMCP.Editor.Core.MCPUnityServer.Instance;
+                    var server = ClaudeCodeMCP.Editor.Core.MCPHttpServer.Instance;
                     serverRunning = server.IsRunning;
                     serverStatus = serverRunning ? "Running on port 8090" : "Not running";
                 }
@@ -252,7 +252,7 @@ namespace ClaudeCodeMCP.Editor
             
             try
             {
-                var server = ClaudeCodeMCP.Editor.Core.MCPUnityServer.Instance;
+                var server = ClaudeCodeMCP.Editor.Core.MCPHttpServer.Instance;
                 server.StartServer();
                 
                 EditorUtility.DisplayDialog(
@@ -279,7 +279,7 @@ namespace ClaudeCodeMCP.Editor
             
             try
             {
-                var server = ClaudeCodeMCP.Editor.Core.MCPUnityServer.Instance;
+                var server = ClaudeCodeMCP.Editor.Core.MCPHttpServer.Instance;
                 server.StopServer();
                 
                 EditorUtility.DisplayDialog(
@@ -306,7 +306,7 @@ namespace ClaudeCodeMCP.Editor
             
             try
             {
-                var server = ClaudeCodeMCP.Editor.Core.MCPUnityServer.Instance;
+                var server = ClaudeCodeMCP.Editor.Core.MCPHttpServer.Instance;
                 if (server.IsRunning)
                 {
                     // Call the hot reload endpoint directly
@@ -373,7 +373,7 @@ namespace ClaudeCodeMCP.Editor
             
             try
             {
-                var server = ClaudeCodeMCP.Editor.Core.MCPUnityServer.Instance;
+                var server = ClaudeCodeMCP.Editor.Core.MCPHttpServer.Instance;
                 if (server.IsRunning)
                 {
                     // Call the force compilation endpoint

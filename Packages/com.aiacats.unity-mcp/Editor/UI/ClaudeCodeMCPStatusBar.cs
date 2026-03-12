@@ -63,7 +63,7 @@ namespace ClaudeCodeMCP.Editor
                 statusStyle.fontSize = 12;
             }
 
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             bool isRunning = server.IsRunning;
 
             // Status display settings
@@ -130,7 +130,7 @@ namespace ClaudeCodeMCP.Editor
 
         private static void DrawProjectStatus()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             bool isRunning = server.IsRunning;
 
             string statusText = $"Claude Code MCP: {(isRunning ? "Running" : "Stopped")}";

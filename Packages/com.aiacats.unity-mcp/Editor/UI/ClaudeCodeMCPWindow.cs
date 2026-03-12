@@ -70,7 +70,7 @@ namespace ClaudeCodeMCP.Editor
             
             EditorGUILayout.BeginVertical("box");
             
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             bool isRunning = server.IsRunning;
             
             // Status display
@@ -108,7 +108,7 @@ namespace ClaudeCodeMCP.Editor
             
             EditorGUILayout.BeginVertical("box");
             
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             bool isRunning = server.IsRunning;
             
             EditorGUILayout.BeginHorizontal();
@@ -279,7 +279,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestPing()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
@@ -303,7 +303,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestConsoleLog()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
@@ -328,7 +328,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestSceneHierarchy()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
@@ -351,7 +351,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestHotReload(bool optimized = true)
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
@@ -376,7 +376,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestForceCompilation()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
@@ -401,7 +401,7 @@ namespace ClaudeCodeMCP.Editor
 
         private void TestCheckCompilationStatus()
         {
-            var server = MCPUnityServer.Instance;
+            var server = MCPHttpServer.Instance;
             if (!server.IsRunning)
             {
                 Debug.LogWarning("[Claude Code MCP] Server is not running");
