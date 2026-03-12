@@ -36,11 +36,14 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             }
         }
 
-        public JArray GetLogs()
+        public JArray GetLogs(string filterType = null, int limit = 50, int offset = 0, bool includeStackTrace = true)
         {
             var result = new JArray();
             lock (_lock)
             {
+                int skipped = 0;
+                int added = 0;
+
                 foreach (var log in _logs)
                 {
                     string logType = "info";
@@ -56,13 +59,29 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                             break;
                     }
 
-                    result.Add(new JObject
+                    if (!string.IsNullOrEmpty(filterType) && logType != filterType)
+                        continue;
+
+                    if (skipped < offset)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    if (added >= limit) break;
+
+                    var entry = new JObject
                     {
                         ["message"] = log.Message,
-                        ["stackTrace"] = log.StackTrace,
                         ["type"] = logType,
                         ["timestamp"] = log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                    });
+                    };
+
+                    if (includeStackTrace)
+                        entry["stackTrace"] = log.StackTrace;
+
+                    result.Add(entry);
+                    added++;
                 }
             }
             return result;
@@ -107,7 +126,17 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
         public override string Handle(string requestBody)
         {
-            return CreateSuccessResponse("console_logs", _state.GetLogs());
+            var request = JObject.Parse(requestBody);
+            string logType = request["logType"]?.ToString()?.ToLower();
+            int limit = request["limit"]?.ToObject<int>() ?? 50;
+            int offset = request["offset"]?.ToObject<int>() ?? 0;
+            bool includeStackTrace = request["includeStackTrace"]?.ToObject<bool>() ?? true;
+
+            if (limit < 1) limit = 1;
+            if (limit > 500) limit = 500;
+            if (offset < 0) offset = 0;
+
+            return CreateSuccessResponse("console_logs", _state.GetLogs(logType, limit, offset, includeStackTrace));
         }
     }
 }

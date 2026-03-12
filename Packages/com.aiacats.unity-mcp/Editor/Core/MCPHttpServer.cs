@@ -155,7 +155,6 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/force_compilation"] = new ForceCompilationHandler(this);
             _handlers["/mcp/tools/check_compilation_status"] = new CheckCompilationStatusHandler(this, CompilationState);
             _handlers["/mcp/tools/get_compilation_errors"] = new GetCompilationErrorsHandler(this, CompilationState);
-            _handlers["/mcp/tools/auto_fix_errors"] = new AutoFixErrorsHandler(this);
 
             // Scene & Assets
             _handlers["/mcp/tools/save_scene"] = new SaveSceneHandler(this);

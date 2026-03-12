@@ -11,55 +11,56 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
         public override string Handle(string requestBody)
         {
-            var request = JObject.Parse(requestBody);
-            string objectPath = request["objectPath"]?.ToString();
-            string componentName = request["componentName"]?.ToString();
-            var componentData = request["componentData"] as JObject;
+            return ExecuteOnMainThread(() => {
+                var request = JObject.Parse(requestBody);
+                string componentName = request["componentName"]?.ToString();
+                var componentData = request["componentData"] as JObject;
 
-            GameObject target = GameObject.Find(objectPath);
-            if (target == null)
-                return CreateErrorResponse("gameobject_not_found", "GameObject not found");
+                var target = FindGameObject(request);
+                if (target == null)
+                    return CreateErrorResponse("gameobject_not_found", "GameObject not found");
 
-            var componentType = ResolveComponentType(componentName);
-            if (componentType == null)
-                return CreateErrorResponse("component_type_not_found", $"Component type not found: {componentName}");
+                var componentType = ResolveComponentType(componentName, target);
+                if (componentType == null)
+                    return CreateErrorResponse("component_type_not_found", $"Component type not found: {componentName}");
 
-            var component = target.GetComponent(componentType);
-            if (component == null)
-            {
-                component = target.AddComponent(componentType);
-                Undo.RegisterCreatedObjectUndo(component, "Add Component via MCP");
-            }
-
-            Undo.RecordObject(component, "Update Component via MCP");
-
-            if (componentData != null)
-            {
-                foreach (var property in componentData)
+                var component = target.GetComponent(componentType);
+                if (component == null)
                 {
-                    try
-                    {
-                        var field = componentType.GetField(property.Key);
-                        var prop = componentType.GetProperty(property.Key);
+                    component = target.AddComponent(componentType);
+                    Undo.RegisterCreatedObjectUndo(component, "Add Component via MCP");
+                }
 
-                        if (field != null)
-                        {
-                            field.SetValue(component, property.Value.ToObject(field.FieldType));
-                        }
-                        else if (prop != null && prop.CanWrite)
-                        {
-                            prop.SetValue(component, property.Value.ToObject(prop.PropertyType));
-                        }
-                    }
-                    catch (Exception ex)
+                Undo.RecordObject(component, "Update Component via MCP");
+
+                if (componentData != null)
+                {
+                    foreach (var property in componentData)
                     {
-                        Debug.LogWarning($"[Claude Code MCP] Failed to set {property.Key}: {ex.Message}");
+                        try
+                        {
+                            var field = componentType.GetField(property.Key);
+                            var prop = componentType.GetProperty(property.Key);
+
+                            if (field != null)
+                            {
+                                field.SetValue(component, property.Value.ToObject(field.FieldType));
+                            }
+                            else if (prop != null && prop.CanWrite)
+                            {
+                                prop.SetValue(component, property.Value.ToObject(prop.PropertyType));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning($"[Claude Code MCP] Failed to set {property.Key}: {ex.Message}");
+                        }
                     }
                 }
-            }
 
-            EditorUtility.SetDirty(target);
-            return CreateSuccessResponse("component_updated", $"Updated {componentName} on {target.name}");
+                EditorUtility.SetDirty(target);
+                return CreateSuccessResponse("component_updated", $"Updated {componentName} on {target.name}");
+            });
         }
     }
 

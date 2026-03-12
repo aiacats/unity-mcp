@@ -159,49 +159,51 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
         public override string Handle(string requestBody)
         {
-            var request = JObject.Parse(requestBody);
-            string assetPath = request["assetPath"]?.ToString();
-            string guid = request["guid"]?.ToString();
-            string parentPath = request["parentPath"]?.ToString();
-            int? parentId = request["parentId"]?.ToObject<int?>();
-            var position = request["position"] as JObject;
+            return ExecuteOnMainThread(() => {
+                var request = JObject.Parse(requestBody);
+                string assetPath = request["assetPath"]?.ToString();
+                string guid = request["guid"]?.ToString();
+                string parentPath = request["parentPath"]?.ToString();
+                int? parentId = request["parentId"]?.ToObject<int?>();
+                var position = request["position"] as JObject;
 
-            UnityEngine.Object asset = null;
-            if (!string.IsNullOrEmpty(assetPath))
-                asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
-            else if (!string.IsNullOrEmpty(guid))
-                asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AssetDatabase.GUIDToAssetPath(guid));
+                UnityEngine.Object asset = null;
+                if (!string.IsNullOrEmpty(assetPath))
+                    asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                else if (!string.IsNullOrEmpty(guid))
+                    asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AssetDatabase.GUIDToAssetPath(guid));
 
-            if (asset == null)
-                return CreateErrorResponse("asset_not_found", "Asset not found");
+                if (asset == null)
+                    return CreateErrorResponse("asset_not_found", "Asset not found");
 
-            GameObject instance = PrefabUtility.InstantiatePrefab(asset) as GameObject;
-            if (instance == null)
-                return CreateErrorResponse("instantiate_failed", "Failed to instantiate asset");
+                GameObject instance = PrefabUtility.InstantiatePrefab(asset) as GameObject;
+                if (instance == null)
+                    return CreateErrorResponse("instantiate_failed", "Failed to instantiate asset");
 
-            if (parentId.HasValue)
-            {
-                var parent = EditorUtility.InstanceIDToObject(parentId.Value) as GameObject;
-                if (parent != null) instance.transform.SetParent(parent.transform);
-            }
-            else if (!string.IsNullOrEmpty(parentPath))
-            {
-                var parent = GameObject.Find(parentPath);
-                if (parent != null) instance.transform.SetParent(parent.transform);
-            }
+                if (parentId.HasValue)
+                {
+                    var parent = EditorUtility.InstanceIDToObject(parentId.Value) as GameObject;
+                    if (parent != null) instance.transform.SetParent(parent.transform);
+                }
+                else if (!string.IsNullOrEmpty(parentPath))
+                {
+                    var parent = GameObject.Find(parentPath);
+                    if (parent != null) instance.transform.SetParent(parent.transform);
+                }
 
-            if (position != null)
-            {
-                instance.transform.position = new Vector3(
-                    position["x"]?.ToObject<float>() ?? 0f,
-                    position["y"]?.ToObject<float>() ?? 0f,
-                    position["z"]?.ToObject<float>() ?? 0f
-                );
-            }
+                if (position != null)
+                {
+                    instance.transform.position = new Vector3(
+                        position["x"]?.ToObject<float>() ?? 0f,
+                        position["y"]?.ToObject<float>() ?? 0f,
+                        position["z"]?.ToObject<float>() ?? 0f
+                    );
+                }
 
-            Undo.RegisterCreatedObjectUndo(instance, "Add Asset to Scene");
-            Selection.activeGameObject = instance;
-            return CreateSuccessResponse("asset_added", $"Added {instance.name} to scene");
+                Undo.RegisterCreatedObjectUndo(instance, "Add Asset to Scene");
+                Selection.activeGameObject = instance;
+                return CreateSuccessResponse("asset_added", $"Added {instance.name} to scene");
+            });
         }
     }
 

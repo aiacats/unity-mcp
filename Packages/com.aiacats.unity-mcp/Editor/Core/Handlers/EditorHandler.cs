@@ -257,18 +257,4 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             });
         }
     }
-
-    internal class AutoFixErrorsHandler : HandlerBase
-    {
-        public AutoFixErrorsHandler(MCPHttpServer server) : base(server) { }
-
-        public override string Handle(string requestBody)
-        {
-            return CreateSuccessResponse("auto_fix_disabled", new JObject
-            {
-                ["message"] = "Auto-fix functionality has been permanently disabled",
-                ["reason"] = "Safety measure to prevent automatic code modification"
-            });
-        }
-    }
 }

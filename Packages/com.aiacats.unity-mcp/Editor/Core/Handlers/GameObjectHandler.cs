@@ -97,24 +97,30 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
         {
             return ExecuteOnMainThread(() => {
                 var request = JObject.Parse(requestBody);
-                string objectPath = request["objectPath"]?.ToString();
                 var gameObjectData = request["gameObjectData"] as JObject;
 
-                GameObject target = null;
-                if (!string.IsNullOrEmpty(objectPath))
+                if (gameObjectData == null)
+                    return CreateErrorResponse("missing_parameter", "gameObjectData is required");
+
+                GameObject target = FindGameObject(request);
+                bool isNew = false;
+
+                if (target == null)
                 {
-                    target = GameObject.Find(objectPath);
-                    if (target == null)
+                    string objectPath = request["objectPath"]?.ToString();
+                    if (!string.IsNullOrEmpty(objectPath))
                     {
                         target = new GameObject(objectPath);
                         Undo.RegisterCreatedObjectUndo(target, "Create GameObject via MCP");
+                        isNew = true;
+                    }
+                    else
+                    {
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found and no objectPath to create");
                     }
                 }
 
-                if (target == null || gameObjectData == null)
-                    return CreateErrorResponse("gameobject_update_failed", "Failed to update GameObject");
-
-                Undo.RecordObject(target, "Update GameObject via MCP");
+                if (!isNew) Undo.RecordObject(target, "Update GameObject via MCP");
 
                 if (gameObjectData["name"] != null)
                     target.name = gameObjectData["name"].ToString();
@@ -122,9 +128,13 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     target.SetActive(gameObjectData["activeSelf"].ToObject<bool>());
                 if (gameObjectData["tag"] != null)
                     target.tag = gameObjectData["tag"].ToString();
+                if (gameObjectData["layer"] != null)
+                    target.layer = gameObjectData["layer"].ToObject<int>();
+                if (gameObjectData["isStatic"] != null)
+                    target.isStatic = gameObjectData["isStatic"].ToObject<bool>();
 
                 EditorUtility.SetDirty(target);
-                return CreateSuccessResponse("gameobject_updated", $"Updated: {target.name}");
+                return CreateSuccessResponse("gameobject_updated", $"{(isNew ? "Created" : "Updated")}: {target.name}");
             });
         }
     }
