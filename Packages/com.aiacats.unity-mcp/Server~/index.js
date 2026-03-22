@@ -507,19 +507,13 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'screenshot',
-            description: 'Captures a screenshot from the Game view.',
+            description: 'Captures a screenshot of the entire Unity Editor window (including Hierarchy, Inspector, Scene/Game view, Console, etc.) using Windows API. Returns the image directly for visual inspection. Only supported on Windows.',
             inputSchema: {
               type: 'object',
               properties: {
                 savePath: {
                   type: 'string',
                   description: 'Path to save the screenshot (e.g. "Assets/Screenshots/shot.png"). Default: auto-generated with timestamp'
-                },
-                superSize: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 8,
-                  description: 'Resolution multiplier (1 = normal, 2 = double, etc.). Default: 1'
                 }
               }
             }
@@ -591,7 +585,24 @@ class ClaudeCodeMCPUnityServer {
         }
 
         const data = await response.json();
-        console.error(`[MCP Unity] Tool response:`, JSON.stringify(data));
+        console.error(`[MCP Unity] Tool response for: ${name}`);
+
+        // Return screenshot as image content for visual inspection
+        if (name === 'screenshot' && data.success && data.data?.base64) {
+          const { base64, ...meta } = data.data;
+          const content = [
+            {
+              type: 'image',
+              data: base64,
+              mimeType: 'image/png'
+            },
+            {
+              type: 'text',
+              text: JSON.stringify({ ...data, data: meta }, null, 2)
+            }
+          ];
+          return { content };
+        }
 
         return {
           content: [

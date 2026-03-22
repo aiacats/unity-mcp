@@ -71,7 +71,7 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 |---------|------|--------------|
 | `hot_reload` | スクリプト再コンパイル | `saveAssets`, `optimized` |
 | `force_compilation` | 強制フルコンパイル | `forceUpdate` |
-| `screenshot` | Game ビューのスクリーンショット | `savePath`, `superSize` |
+| `screenshot` | Unity Editor ウィンドウ全体のスクリーンショット (Windows API) | `savePath` |
 
 ### モニタリング・デバッグ
 

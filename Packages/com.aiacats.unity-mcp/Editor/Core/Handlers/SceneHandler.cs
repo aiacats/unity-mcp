@@ -270,29 +270,211 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             return ExecuteOnMainThread(() => {
                 var request = JObject.Parse(requestBody);
                 string savePath = request["savePath"]?.ToString();
-                int superSize = request["superSize"]?.ToObject<int>() ?? 1;
 
-                if (string.IsNullOrEmpty(savePath))
-                {
-                    string directory = "Assets/Screenshots";
-                    if (!System.IO.Directory.Exists(directory))
-                        System.IO.Directory.CreateDirectory(directory);
-                    savePath = $"{directory}/Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-                }
-
-                string dir = System.IO.Path.GetDirectoryName(savePath);
-                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
-                    System.IO.Directory.CreateDirectory(dir);
-
-                ScreenCapture.CaptureScreenshot(savePath, superSize);
-                EditorApplication.delayCall += () => AssetDatabase.Refresh();
-
-                return CreateSuccessResponse("screenshot_taken", new JObject
-                {
-                    ["path"] = savePath,
-                    ["superSize"] = superSize
-                });
+#if UNITY_EDITOR_WIN
+                return CaptureWithWin32(savePath);
+#else
+                return CreateErrorResponse("platform_not_supported",
+                    "Screenshot capture is only supported on Windows.");
+#endif
             });
         }
+
+#if UNITY_EDITOR_WIN
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr hdc);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern int GetDIBits(IntPtr hdc, IntPtr hbmp, uint uStartScan, uint cScanLines,
+            byte[] lpvBits, ref BITMAPINFO lpbi, uint uUsage);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct BITMAPINFOHEADER
+        {
+            public uint biSize;
+            public int biWidth;
+            public int biHeight;
+            public ushort biPlanes;
+            public ushort biBitCount;
+            public uint biCompression;
+            public uint biSizeImage;
+            public int biXPelsPerMeter;
+            public int biYPelsPerMeter;
+            public uint biClrUsed;
+            public uint biClrImportant;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct BITMAPINFO
+        {
+            public BITMAPINFOHEADER bmiHeader;
+        }
+
+        private static IntPtr FindUnityMainWindow()
+        {
+            uint currentProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+            IntPtr found = IntPtr.Zero;
+
+            EnumWindows((hWnd, lParam) => {
+                GetWindowThreadProcessId(hWnd, out uint processId);
+                if (processId != currentProcessId || !IsWindowVisible(hWnd))
+                    return true;
+
+                var sb = new System.Text.StringBuilder(256);
+                GetWindowText(hWnd, sb, sb.Capacity);
+                string title = sb.ToString();
+
+                if (title.Contains("Unity") && (title.Contains("-") || title.Contains("Editor")))
+                {
+                    found = hWnd;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            return found;
+        }
+
+        private string CaptureWithWin32(string savePath)
+        {
+            IntPtr hWnd = FindUnityMainWindow();
+            if (hWnd == IntPtr.Zero)
+                return CreateErrorResponse("window_not_found", "Unity Editor window not found.");
+
+            if (!GetWindowRect(hWnd, out RECT rect))
+                return CreateErrorResponse("capture_failed", "Failed to get window dimensions.");
+
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+
+            if (width <= 0 || height <= 0)
+                return CreateErrorResponse("capture_failed", "Invalid window dimensions.");
+
+            IntPtr hdcScreen = GetDC(IntPtr.Zero);
+            IntPtr hdcMem = CreateCompatibleDC(hdcScreen);
+            IntPtr hBitmap = CreateCompatibleBitmap(hdcScreen, width, height);
+            IntPtr hOld = SelectObject(hdcMem, hBitmap);
+
+            // PW_RENDERFULLCONTENT = 2: captures even if window is occluded
+            bool captured = PrintWindow(hWnd, hdcMem, 2);
+            if (!captured)
+            {
+                // Fallback: PW_CLIENTONLY = 0
+                captured = PrintWindow(hWnd, hdcMem, 0);
+            }
+
+            byte[] pngBytes = null;
+            if (captured)
+            {
+                var bmi = new BITMAPINFO();
+                bmi.bmiHeader.biSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(BITMAPINFOHEADER));
+                bmi.bmiHeader.biWidth = width;
+                bmi.bmiHeader.biHeight = -height; // top-down
+                bmi.bmiHeader.biPlanes = 1;
+                bmi.bmiHeader.biBitCount = 32;
+                bmi.bmiHeader.biCompression = 0; // BI_RGB
+
+                byte[] bits = new byte[width * height * 4];
+                GetDIBits(hdcMem, hBitmap, 0, (uint)height, bits, ref bmi, 0);
+
+                // Convert BGRA → RGBA for Texture2D
+                var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                var pixels = new Color32[width * height];
+
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    int offset = i * 4;
+                    pixels[i] = new Color32(bits[offset + 2], bits[offset + 1], bits[offset], 255);
+                }
+
+                texture.SetPixels32(pixels);
+                texture.Apply();
+                pngBytes = texture.EncodeToPNG();
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+
+            // Cleanup GDI resources
+            SelectObject(hdcMem, hOld);
+            DeleteObject(hBitmap);
+            DeleteDC(hdcMem);
+            ReleaseDC(IntPtr.Zero, hdcScreen);
+
+            if (pngBytes == null)
+                return CreateErrorResponse("capture_failed", "Failed to capture window content.");
+
+            // Save to file
+            if (string.IsNullOrEmpty(savePath))
+            {
+                string directory = "Assets/Screenshots";
+                if (!System.IO.Directory.Exists(directory))
+                    System.IO.Directory.CreateDirectory(directory);
+                savePath = $"{directory}/Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+            }
+
+            string dir = System.IO.Path.GetDirectoryName(savePath);
+            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            System.IO.File.WriteAllBytes(savePath, pngBytes);
+            EditorApplication.delayCall += () => AssetDatabase.Refresh();
+
+            string base64 = Convert.ToBase64String(pngBytes);
+
+            return CreateSuccessResponse("screenshot_taken", new JObject
+            {
+                ["path"] = savePath,
+                ["width"] = width,
+                ["height"] = height,
+                ["base64"] = base64
+            });
+        }
+#endif
     }
 }

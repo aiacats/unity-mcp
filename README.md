@@ -139,7 +139,7 @@ Once installed, Claude Code can control Unity using natural language:
 
 - **hot_reload**: Trigger script recompilation
 - **force_compilation**: Force full compilation
-- **screenshot**: Capture Game view screenshots
+- **screenshot**: Capture entire Unity Editor window screenshot (Windows API)
 
 #### Monitoring & Debugging
 
