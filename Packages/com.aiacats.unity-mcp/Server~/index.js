@@ -506,6 +506,56 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
+            name: 'get_material_properties',
+            description: 'Gets all shader properties of a Material asset with their current values, types, and metadata (range limits, texture info, keywords).',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                assetPath: {
+                  type: 'string',
+                  description: 'The asset path of the material (e.g. "Assets/Materials/MyMaterial.mat")'
+                },
+                guid: {
+                  type: 'string',
+                  description: 'The GUID of the material asset (alternative to assetPath)'
+                }
+              }
+            }
+          },
+          {
+            name: 'set_material_property',
+            description: 'Sets a shader property on a Material asset. Supports Float, Int, Color, Vector, Texture, Range, and Keyword types. Also supports setting renderQueue. Supports undo.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                assetPath: {
+                  type: 'string',
+                  description: 'The asset path of the material (e.g. "Assets/Materials/MyMaterial.mat")'
+                },
+                guid: {
+                  type: 'string',
+                  description: 'The GUID of the material asset (alternative to assetPath)'
+                },
+                propertyName: {
+                  type: 'string',
+                  description: 'The shader property name (e.g. "_Color", "_MainTex", "_Metallic", "_Glossiness", "renderQueue")'
+                },
+                propertyType: {
+                  type: 'string',
+                  enum: ['Float', 'Int', 'Color', 'Vector', 'Texture', 'Range', 'Keyword'],
+                  description: 'The type of the property. If omitted, auto-detected from shader. Use "Keyword" to toggle shader keywords.'
+                },
+                value: {
+                  description: 'The value to set. Format depends on propertyType: Float/Range=number, Int=integer, Color={r,g,b,a}, Vector={x,y,z,w}, Texture={path,guid,offset?,scale?} or "path" string, Keyword=boolean (enable/disable).'
+                },
+                keyword: {
+                  type: 'string',
+                  description: 'The shader keyword name (only used when propertyType is "Keyword", e.g. "_EMISSION", "_NORMALMAP")'
+                }
+              }
+            }
+          },
+          {
             name: 'screenshot',
             description: 'Captures a screenshot of the entire Unity Editor window (including Hierarchy, Inspector, Scene/Game view, Console, etc.) using Windows API. Returns the image directly for visual inspection. Only supported on Windows.',
             inputSchema: {

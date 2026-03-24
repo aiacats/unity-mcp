@@ -132,6 +132,8 @@ Once installed, Claude Code can control Unity using natural language:
 - **find_assets**: Search AssetDatabase with filter, type, and folder
 - **add_asset_to_scene**: Instantiate prefabs and assets
 - **create_material**: Create Material assets with shader and color
+- **get_material_properties**: Get all shader properties of a material with current values
+- **set_material_property**: Set shader properties (Float, Int, Color, Vector, Texture, Range, Keyword)
 - **execute_menu_item**: Run Unity menu commands
 - **add_package**: Install packages via Package Manager
 

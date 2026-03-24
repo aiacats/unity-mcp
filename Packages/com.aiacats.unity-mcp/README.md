@@ -62,6 +62,8 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 | `find_assets` | AssetDatabase 検索 | `filter`, `type`, `searchInFolder`, `limit` |
 | `add_asset_to_scene` | Prefab 等をシーンに配置 | `assetPath` or `guid`, `position` |
 | `create_material` | マテリアルを作成 | `name`, `shader`, `color{r,g,b,a}`, `savePath` |
+| `get_material_properties` | マテリアルの全Shaderプロパティと現在値を取得 | `assetPath` or `guid` |
+| `set_material_property` | マテリアルのShaderプロパティを設定 | `assetPath` or `guid`, `propertyName`, `propertyType`, `value` |
 | `execute_menu_item` | メニューコマンドを実行 | `menuPath` |
 | `add_package` | Package Manager でパッケージ追加 | `source(registry/github/disk)`, `packageName` |
 

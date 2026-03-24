@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.Rendering;
 using Newtonsoft.Json.Linq;
 
 namespace ClaudeCodeMCP.Editor.Core.Handlers
@@ -258,6 +259,348 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     ["guid"] = AssetDatabase.AssetPathToGUID(savePath)
                 });
             });
+        }
+    }
+
+    internal class GetMaterialPropertiesHandler : HandlerBase
+    {
+        public GetMaterialPropertiesHandler(MCPHttpServer server) : base(server) { }
+
+        public override string Handle(string requestBody)
+        {
+            return ExecuteOnMainThread(() => {
+                var request = JObject.Parse(requestBody);
+                string assetPath = request["assetPath"]?.ToString();
+                string guid = request["guid"]?.ToString();
+
+                Material material = LoadMaterial(assetPath, guid);
+                if (material == null)
+                    return CreateErrorResponse("material_not_found", "Material not found. Specify assetPath or guid.");
+
+                var shader = material.shader;
+                int propertyCount = shader.GetPropertyCount();
+
+                var properties = new JArray();
+                for (int i = 0; i < propertyCount; i++)
+                {
+                    string propName = shader.GetPropertyName(i);
+                    var propType = shader.GetPropertyType(i);
+                    string description = shader.GetPropertyDescription(i);
+                    var flags = shader.GetPropertyFlags(i);
+
+                    var propObj = new JObject
+                    {
+                        ["name"] = propName,
+                        ["description"] = description,
+                        ["type"] = propType.ToString(),
+                        ["flags"] = flags.ToString()
+                    };
+
+                    switch (propType)
+                    {
+                        case ShaderPropertyType.Color:
+                            var color = material.GetColor(propName);
+                            propObj["value"] = new JObject
+                            {
+                                ["r"] = color.r, ["g"] = color.g,
+                                ["b"] = color.b, ["a"] = color.a
+                            };
+                            break;
+                        case ShaderPropertyType.Vector:
+                            var vec = material.GetVector(propName);
+                            propObj["value"] = new JObject
+                            {
+                                ["x"] = vec.x, ["y"] = vec.y,
+                                ["z"] = vec.z, ["w"] = vec.w
+                            };
+                            break;
+                        case ShaderPropertyType.Float:
+                        case ShaderPropertyType.Range:
+                            propObj["value"] = material.GetFloat(propName);
+                            if (propType == ShaderPropertyType.Range)
+                            {
+                                var range = shader.GetPropertyRangeLimits(i);
+                                propObj["min"] = range.x;
+                                propObj["max"] = range.y;
+                            }
+                            break;
+                        case ShaderPropertyType.Texture:
+                            var tex = material.GetTexture(propName);
+                            if (tex != null)
+                            {
+                                string texPath = AssetDatabase.GetAssetPath(tex);
+                                propObj["value"] = new JObject
+                                {
+                                    ["name"] = tex.name,
+                                    ["path"] = texPath,
+                                    ["type"] = tex.GetType().Name
+                                };
+                                var offset = material.GetTextureOffset(propName);
+                                var scale = material.GetTextureScale(propName);
+                                propObj["offset"] = new JObject { ["x"] = offset.x, ["y"] = offset.y };
+                                propObj["scale"] = new JObject { ["x"] = scale.x, ["y"] = scale.y };
+                            }
+                            else
+                            {
+                                propObj["value"] = null;
+                            }
+                            break;
+                        case ShaderPropertyType.Int:
+                            propObj["value"] = material.GetInteger(propName);
+                            break;
+                    }
+
+                    properties.Add(propObj);
+                }
+
+                // Collect enabled keywords
+                var keywords = new JArray();
+                foreach (var keyword in material.enabledKeywords)
+                    keywords.Add(keyword.name);
+
+                var result = new JObject
+                {
+                    ["name"] = material.name,
+                    ["shader"] = shader.name,
+                    ["renderQueue"] = material.renderQueue,
+                    ["passCount"] = shader.passCount,
+                    ["enabledKeywords"] = keywords,
+                    ["properties"] = properties
+                };
+
+                return CreateSuccessResponse("material_properties", result);
+            });
+        }
+
+        private static Material LoadMaterial(string assetPath, string guid)
+        {
+            if (!string.IsNullOrEmpty(assetPath))
+                return AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+            if (!string.IsNullOrEmpty(guid))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!string.IsNullOrEmpty(path))
+                    return AssetDatabase.LoadAssetAtPath<Material>(path);
+            }
+            return null;
+        }
+    }
+
+    internal class SetMaterialPropertyHandler : HandlerBase
+    {
+        public SetMaterialPropertyHandler(MCPHttpServer server) : base(server) { }
+
+        public override string Handle(string requestBody)
+        {
+            return ExecuteOnMainThread(() => {
+                var request = JObject.Parse(requestBody);
+                string assetPath = request["assetPath"]?.ToString();
+                string guid = request["guid"]?.ToString();
+                string propertyName = request["propertyName"]?.ToString();
+                string propertyType = request["propertyType"]?.ToString();
+                var value = request["value"];
+
+                Material material = LoadMaterial(assetPath, guid);
+                if (material == null)
+                    return CreateErrorResponse("material_not_found", "Material not found. Specify assetPath or guid.");
+
+                // Shader keyword toggle
+                if (string.Equals(propertyType, "Keyword", StringComparison.OrdinalIgnoreCase))
+                {
+                    string keyword = request["keyword"]?.ToString() ?? propertyName;
+                    bool enabled = value?.ToObject<bool>() ?? true;
+                    if (string.IsNullOrEmpty(keyword))
+                        return CreateErrorResponse("missing_parameter", "keyword is required for Keyword type.");
+
+                    Undo.RecordObject(material, "Set Material Keyword");
+                    if (enabled)
+                        material.EnableKeyword(keyword);
+                    else
+                        material.DisableKeyword(keyword);
+
+                    EditorUtility.SetDirty(material);
+                    AssetDatabase.SaveAssets();
+                    return CreateSuccessResponse("material_keyword_set", new JObject
+                    {
+                        ["keyword"] = keyword,
+                        ["enabled"] = enabled
+                    });
+                }
+
+                // RenderQueue special property
+                if (string.Equals(propertyName, "renderQueue", StringComparison.OrdinalIgnoreCase))
+                {
+                    int queue = value?.ToObject<int>() ?? -1;
+                    Undo.RecordObject(material, "Set Material RenderQueue");
+                    material.renderQueue = queue;
+                    EditorUtility.SetDirty(material);
+                    AssetDatabase.SaveAssets();
+                    return CreateSuccessResponse("material_property_set", new JObject
+                    {
+                        ["property"] = "renderQueue",
+                        ["value"] = queue
+                    });
+                }
+
+                if (string.IsNullOrEmpty(propertyName))
+                    return CreateErrorResponse("missing_parameter", "propertyName is required.");
+
+                if (!material.HasProperty(propertyName))
+                    return CreateErrorResponse("property_not_found", $"Property '{propertyName}' not found on material '{material.name}'.");
+
+                // Auto-detect type from shader if not specified
+                if (string.IsNullOrEmpty(propertyType))
+                    propertyType = DetectPropertyType(material.shader, propertyName);
+
+                if (string.IsNullOrEmpty(propertyType))
+                    return CreateErrorResponse("missing_parameter", "propertyType is required (or could not be auto-detected).");
+
+                Undo.RecordObject(material, "Set Material Property");
+
+                string resultType = "material_property_set";
+                JToken resultValue;
+
+                switch (propertyType.ToLower())
+                {
+                    case "float":
+                    case "range":
+                    {
+                        float f = value?.ToObject<float>() ?? 0f;
+                        material.SetFloat(propertyName, f);
+                        resultValue = f;
+                        break;
+                    }
+                    case "int":
+                    case "integer":
+                    {
+                        int iv = value?.ToObject<int>() ?? 0;
+                        material.SetInteger(propertyName, iv);
+                        resultValue = iv;
+                        break;
+                    }
+                    case "color":
+                    {
+                        var colorObj = value as JObject;
+                        if (colorObj == null)
+                            return CreateErrorResponse("invalid_value", "Color value must be an object with r, g, b, a fields.");
+                        var color = new Color(
+                            colorObj["r"]?.ToObject<float>() ?? 0f,
+                            colorObj["g"]?.ToObject<float>() ?? 0f,
+                            colorObj["b"]?.ToObject<float>() ?? 0f,
+                            colorObj["a"]?.ToObject<float>() ?? 1f
+                        );
+                        material.SetColor(propertyName, color);
+                        resultValue = new JObject
+                        {
+                            ["r"] = color.r, ["g"] = color.g,
+                            ["b"] = color.b, ["a"] = color.a
+                        };
+                        break;
+                    }
+                    case "vector":
+                    {
+                        var vecObj = value as JObject;
+                        if (vecObj == null)
+                            return CreateErrorResponse("invalid_value", "Vector value must be an object with x, y, z, w fields.");
+                        var vec = new Vector4(
+                            vecObj["x"]?.ToObject<float>() ?? 0f,
+                            vecObj["y"]?.ToObject<float>() ?? 0f,
+                            vecObj["z"]?.ToObject<float>() ?? 0f,
+                            vecObj["w"]?.ToObject<float>() ?? 0f
+                        );
+                        material.SetVector(propertyName, vec);
+                        resultValue = new JObject
+                        {
+                            ["x"] = vec.x, ["y"] = vec.y,
+                            ["z"] = vec.z, ["w"] = vec.w
+                        };
+                        break;
+                    }
+                    case "texture":
+                    {
+                        var texObj = value as JObject;
+                        string texPath = texObj?["path"]?.ToString() ?? value?.ToString();
+                        string texGuid = texObj?["guid"]?.ToString();
+
+                        Texture texture = null;
+                        if (!string.IsNullOrEmpty(texPath))
+                            texture = AssetDatabase.LoadAssetAtPath<Texture>(texPath);
+                        else if (!string.IsNullOrEmpty(texGuid))
+                        {
+                            string p = AssetDatabase.GUIDToAssetPath(texGuid);
+                            if (!string.IsNullOrEmpty(p))
+                                texture = AssetDatabase.LoadAssetAtPath<Texture>(p);
+                        }
+
+                        // null texture is valid (clears the texture slot)
+                        material.SetTexture(propertyName, texture);
+
+                        // Optional offset/scale
+                        var offsetObj = texObj?["offset"] as JObject;
+                        var scaleObj = texObj?["scale"] as JObject;
+                        if (offsetObj != null)
+                        {
+                            material.SetTextureOffset(propertyName, new Vector2(
+                                offsetObj["x"]?.ToObject<float>() ?? 0f,
+                                offsetObj["y"]?.ToObject<float>() ?? 0f
+                            ));
+                        }
+                        if (scaleObj != null)
+                        {
+                            material.SetTextureScale(propertyName, new Vector2(
+                                scaleObj["x"]?.ToObject<float>() ?? 1f,
+                                scaleObj["y"]?.ToObject<float>() ?? 1f
+                            ));
+                        }
+
+                        resultValue = texture != null
+                            ? new JObject
+                            {
+                                ["name"] = texture.name,
+                                ["path"] = AssetDatabase.GetAssetPath(texture)
+                            }
+                            : JValue.CreateNull();
+                        break;
+                    }
+                    default:
+                        return CreateErrorResponse("invalid_type", $"Unsupported property type: {propertyType}. Use: Float, Int, Color, Vector, Texture, Range, Keyword.");
+                }
+
+                EditorUtility.SetDirty(material);
+                AssetDatabase.SaveAssets();
+
+                return CreateSuccessResponse(resultType, new JObject
+                {
+                    ["material"] = material.name,
+                    ["property"] = propertyName,
+                    ["type"] = propertyType,
+                    ["value"] = resultValue
+                });
+            });
+        }
+
+        private static string DetectPropertyType(Shader shader, string propertyName)
+        {
+            int count = shader.GetPropertyCount();
+            for (int i = 0; i < count; i++)
+            {
+                if (shader.GetPropertyName(i) == propertyName)
+                    return shader.GetPropertyType(i).ToString();
+            }
+            return null;
+        }
+
+        private static Material LoadMaterial(string assetPath, string guid)
+        {
+            if (!string.IsNullOrEmpty(assetPath))
+                return AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+            if (!string.IsNullOrEmpty(guid))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!string.IsNullOrEmpty(path))
+                    return AssetDatabase.LoadAssetAtPath<Material>(path);
+            }
+            return null;
         }
     }
 

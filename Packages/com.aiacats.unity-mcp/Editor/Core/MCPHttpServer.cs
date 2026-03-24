@@ -163,6 +163,8 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/find_assets"] = new FindAssetsHandler(this);
             _handlers["/mcp/tools/add_asset_to_scene"] = new AddAssetToSceneHandler(this);
             _handlers["/mcp/tools/create_material"] = new CreateMaterialHandler(this);
+            _handlers["/mcp/tools/get_material_properties"] = new GetMaterialPropertiesHandler(this);
+            _handlers["/mcp/tools/set_material_property"] = new SetMaterialPropertyHandler(this);
             _handlers["/mcp/tools/screenshot"] = new ScreenshotHandler(this);
 
             // Editor control
