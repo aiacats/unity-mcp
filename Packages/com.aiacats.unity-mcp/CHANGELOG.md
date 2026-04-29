@@ -5,6 +5,12 @@ All notable changes to the Claude Code MCP Unity Bridge package will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `MCPAutoBootstrap.cs`: Editor 起動時に `Server~/node_modules` の有無を検出し、未インストールなら自動で `npm install` を実行する InitializeOnLoad スクリプトを追加。`Tools > Claude Code MCP > Setup: Toggle Auto Install on Editor Load` で無効化可能。
+- `Tools > Claude Code MCP > Setup: Auto Install (force)` メニューを追加（手動再実行用）。
+
 ## [1.0.0] - 2025-01-07
 
 ### Added

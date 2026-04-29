@@ -6,6 +6,12 @@ Unity Editor を Claude Code から直接制御するための MCP (Model Contex
 
 ### 1. Node.js 依存関係のインストール
 
+**自動インストール（推奨）**: パッケージ導入後、Unity Editor を起動すると `Server~/node_modules` の有無を検出し、未インストールであれば `npm install` を自動実行します。コンソールに `[Claude Code MCP] npm install completed successfully.` が出れば完了です。
+
+無効化したい場合は `Tools > Claude Code MCP > Setup: Toggle Auto Install on Editor Load` で OFF にできます（EditorPrefs に保存）。
+
+**手動インストール**:
+
 ```bash
 cd Packages/com.aiacats.unity-mcp/Server~
 npm install
