@@ -1,0 +1,16 @@
+using System.Collections;
+using NUnit.Framework;
+using UnityEngine.TestTools;
+
+namespace Tests.PlayMode
+{
+    public class SamplePlayModeTest
+    {
+        [UnityTest]
+        public IEnumerator Sample_AlwaysPasses()
+        {
+            yield return null;
+            Assert.Pass("PlayMode test runner is configured.");
+        }
+    }
+}

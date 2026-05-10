@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-29
+
+### Added
+- **Dev Setup ウィンドウ** (`Tools > Claude Code MCP > Dev Setup`): 開発インフラを 1 ウィンドウで管理する EditorWindow。各機能は独立してインストール／アンインストール可能（冪等）。
+- **Roslyn Analyzer 自動取得** (`Editor/DevSetup/Installers/AnalyzerInstaller.cs`): `Microsoft.Unity.Analyzers` と `Roslynator.Analyzers` を NuGet から取得し、`Assets/Plugins/ClaudeCodeMCP_DevSetup/Analyzers/` に配置。`RoslynAnalyzer` ラベル＋PluginImporter 設定を自動適用。重要度設定の `globalconfig` も同梱。
+- **ZLogger 導入支援** (`ZLoggerInstaller`): OpenUPM スコープレジストリ＋NuGetForUnity を `Packages/manifest.json` に冪等追加し、`Assets/packages.config` に ZLogger エントリを記述。実 DLL の取得は NuGetForUnity の自動復元に委譲。
+- **context7 MCP セットアップ** (`Context7McpInstaller`): プロジェクトの `.mcp.json` と `.claude/settings.local.json` の `enabledMcpjsonServers` に context7 を冪等登録。
+- **テスト雛形ジェネレータ** (`TestAsmdefGenerator`): `Assets/Tests/EditMode` と `Assets/Tests/PlayMode` に asmdef とサンプルテストを生成（既存ファイルは保持）。
+- **pre-commit フック** (`PreCommitHookInstaller`): `.git/hooks/pre-commit` にステージ済み `.cs` を `dotnet format` するブロックをマーカ囲みで冪等挿入。アンインストール時はマーカ部のみ削除し他フックを保持。
+- ユーティリティ群: `ProjectPaths`（Unity/Git ルート解決） / `JsonFileEditor`（Newtonsoft.Json による冪等編集） / `MarkerBlockEditor`（テキストブロック冪等編集） / `NuGetPackageFetcher`（.nupkg DL + analyzer DLL 抽出）。
+- `Templates~/`: pre-commit.sh / EditMode・PlayMode asmdef テンプレート / サンプルテスト雛形。
+
+### Pinned versions
+- Microsoft.Unity.Analyzers: 1.23.0
+- Roslynator.Analyzers: 4.12.9
+- NuGetForUnity: 4.5.0
+- ZLogger: 2.5.10
+- Microsoft.Extensions.Logging: 8.0.0
+
+## [1.0.1]
+
 ### Added
 - `MCPAutoBootstrap.cs`: Editor 起動時に `Server~/node_modules` の有無を検出し、未インストールなら自動で `npm install` を実行する InitializeOnLoad スクリプトを追加。`Tools > Claude Code MCP > Setup: Toggle Auto Install on Editor Load` で無効化可能。
 - `Tools > Claude Code MCP > Setup: Auto Install (force)` メニューを追加（手動再実行用）。

@@ -31,6 +31,7 @@ Thumbs.db
 *~
 !Packages/**/Server~/
 !Packages/**/Samples~/
+!Packages/**/Templates~/
 
 # Unity package lock (auto-generated)
 Packages/packages-lock.json

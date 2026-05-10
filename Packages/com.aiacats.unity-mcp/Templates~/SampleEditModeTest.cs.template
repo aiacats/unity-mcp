@@ -1,0 +1,13 @@
+using NUnit.Framework;
+
+namespace Tests.EditMode
+{
+    public class SampleEditModeTest
+    {
+        [Test]
+        public void Sample_AlwaysPasses()
+        {
+            Assert.Pass("EditMode test runner is configured.");
+        }
+    }
+}
