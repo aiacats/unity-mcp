@@ -38,6 +38,13 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 var request = JObject.Parse(requestBody);
                 string scenePath = request["scenePath"]?.ToString();
                 bool additive = request["additive"]?.ToObject<bool>() ?? false;
+                // When true, force a reload from the .unity file on disk: any unsaved in-memory edits in
+                // the Editor are dropped, and the file's current contents become the active scene state.
+                // Required when the .unity file was edited externally and you want those edits applied
+                // (the default save-first path would otherwise overwrite the external edits).
+                bool reloadFromDisk = request["reloadFromDisk"]?.ToObject<bool>()
+                                       ?? request["discardChanges"]?.ToObject<bool>() // legacy name kept for back-compat
+                                       ?? false;
 
                 if (string.IsNullOrEmpty(scenePath))
                     return CreateErrorResponse("missing_parameter", "scenePath is required");
@@ -45,6 +52,24 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
                 if (currentScene.isDirty && !additive && !string.IsNullOrEmpty(currentScene.path))
                 {
+                    if (reloadFromDisk)
+                    {
+                        // Save-to-temp trick: SaveScene(scene, tempPath, saveAsCopy=false) renames the
+                        // in-memory scene to the temp path and clears its dirty flag without touching
+                        // the real .unity file. Open the real path next, then delete the temp asset.
+                        string tempPath = "Assets/_mcp_scene_reload_" + System.Guid.NewGuid().ToString("N") + ".unity";
+                        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(currentScene, tempPath, false);
+                        try
+                        {
+                            UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath,
+                                UnityEditor.SceneManagement.OpenSceneMode.Single);
+                        }
+                        finally
+                        {
+                            UnityEditor.AssetDatabase.DeleteAsset(tempPath);
+                        }
+                        return CreateSuccessResponse("scene_opened", $"Reloaded from disk (in-memory edits dropped): {scenePath}");
+                    }
                     UnityEditor.SceneManagement.EditorSceneManager.SaveScene(currentScene);
                 }
 

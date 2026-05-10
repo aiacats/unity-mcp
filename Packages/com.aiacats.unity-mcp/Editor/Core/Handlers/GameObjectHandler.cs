@@ -110,8 +110,7 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     string objectPath = request["objectPath"]?.ToString();
                     if (!string.IsNullOrEmpty(objectPath))
                     {
-                        target = new GameObject(objectPath);
-                        Undo.RegisterCreatedObjectUndo(target, "Create GameObject via MCP");
+                        target = CreateGameObjectAtPath(objectPath);
                         isNew = true;
                     }
                     else
@@ -133,9 +132,69 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 if (gameObjectData["isStatic"] != null)
                     target.isStatic = gameObjectData["isStatic"].ToObject<bool>();
 
+                // Optional reparenting: parentPath or parentInstanceId
+                string parentPath = gameObjectData["parentPath"]?.ToString();
+                int? parentId = gameObjectData["parentInstanceId"]?.ToObject<int?>();
+                Transform newParent = null;
+                if (parentId.HasValue)
+                {
+                    var po = EditorUtility.InstanceIDToObject(parentId.Value) as GameObject;
+                    if (po != null) newParent = po.transform;
+                }
+                else if (!string.IsNullOrEmpty(parentPath))
+                {
+                    var po = GameObject.Find(parentPath);
+                    if (po != null) newParent = po.transform;
+                }
+                if (newParent != null && target.transform.parent != newParent)
+                {
+                    Undo.SetTransformParent(target.transform, newParent, "Reparent via MCP");
+                }
+
+                // Optional sibling ordering: -1 = first, otherwise zero-based index (clamped).
+                if (gameObjectData["siblingIndex"] != null)
+                {
+                    int idx = gameObjectData["siblingIndex"].ToObject<int>();
+                    if (idx < 0) target.transform.SetAsFirstSibling();
+                    else target.transform.SetSiblingIndex(idx);
+                }
+
                 EditorUtility.SetDirty(target);
                 return CreateSuccessResponse("gameobject_updated", $"{(isNew ? "Created" : "Updated")}: {target.name}");
             });
+        }
+
+        /// <summary>
+        /// Walk a slash-separated path and create missing intermediate GameObjects, returning the leaf.
+        /// Existing nodes along the path are reused.
+        /// </summary>
+        private static GameObject CreateGameObjectAtPath(string path)
+        {
+            string[] segments = path.Split('/');
+            Transform parent = null;
+            GameObject current = null;
+            string accPath = "";
+
+            foreach (string raw in segments)
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+                accPath = string.IsNullOrEmpty(accPath) ? raw : accPath + "/" + raw;
+
+                GameObject found = GameObject.Find(accPath);
+                if (found != null)
+                {
+                    current = found;
+                    parent = found.transform;
+                    continue;
+                }
+
+                current = new GameObject(raw);
+                Undo.RegisterCreatedObjectUndo(current, "Create GameObject via MCP");
+                if (parent != null) current.transform.SetParent(parent, worldPositionStays: false);
+                parent = current.transform;
+            }
+
+            return current;
         }
     }
 

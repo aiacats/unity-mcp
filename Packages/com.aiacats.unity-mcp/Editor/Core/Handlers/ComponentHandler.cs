@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Reflection;
 using UnityEngine;
 using UnityEditor;
 using Newtonsoft.Json.Linq;
@@ -39,16 +41,21 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     {
                         try
                         {
-                            var field = componentType.GetField(property.Key);
-                            var prop = componentType.GetProperty(property.Key);
+                            FieldInfo field = FindFieldIncludingPrivate(componentType, property.Key);
+                            PropertyInfo prop = componentType.GetProperty(property.Key,
+                                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
                             if (field != null)
                             {
-                                field.SetValue(component, property.Value.ToObject(field.FieldType));
+                                field.SetValue(component, ConvertJsonToFieldValue(property.Value, field.FieldType));
                             }
                             else if (prop != null && prop.CanWrite)
                             {
-                                prop.SetValue(component, property.Value.ToObject(prop.PropertyType));
+                                prop.SetValue(component, ConvertJsonToFieldValue(property.Value, prop.PropertyType));
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"[Claude Code MCP] No writable field/property '{property.Key}' on {componentType.Name}");
                             }
                         }
                         catch (Exception ex)
@@ -61,6 +68,198 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 EditorUtility.SetDirty(target);
                 return CreateSuccessResponse("component_updated", $"Updated {componentName} on {target.name}");
             });
+        }
+
+        /// <summary>
+        /// Walk up the inheritance chain so private SerializeField on base classes are found.
+        /// </summary>
+        private static FieldInfo FindFieldIncludingPrivate(Type type, string name)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            for (Type t = type; t != null; t = t.BaseType)
+            {
+                FieldInfo f = t.GetField(name, flags);
+                if (f != null) return f;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Converts a JSON value to a typed value, with special-case resolution for UnityEngine.Object references
+        /// (instanceId / objectPath / componentName) and recursive handling of List/Array/POCO with nested
+        /// UnityEngine.Object fields.
+        /// </summary>
+        private object ConvertJsonToFieldValue(JToken value, Type targetType)
+        {
+            if (value == null || value.Type == JTokenType.Null) return null;
+
+            // 1) UnityEngine.Object reference (the leaf case)
+            if (typeof(UnityEngine.Object).IsAssignableFrom(targetType))
+            {
+                int? instanceId = null;
+                string objectPath = null;
+                string componentName = null;
+                string assetPath = null;
+                string guid = null;
+                string subAssetName = null;
+
+                if (value.Type == JTokenType.Integer)
+                {
+                    instanceId = value.ToObject<int>();
+                }
+                else if (value.Type == JTokenType.Object)
+                {
+                    JObject obj = (JObject)value;
+                    instanceId = obj["instanceId"]?.ToObject<int?>();
+                    objectPath = obj["objectPath"]?.ToString();
+                    componentName = obj["componentName"]?.ToString();
+                    assetPath = obj["assetPath"]?.ToString();
+                    guid = obj["guid"]?.ToString();
+                    subAssetName = obj["subAssetName"]?.ToString();
+                }
+                else if (value.Type == JTokenType.String)
+                {
+                    string s = value.ToString();
+                    // Heuristic: a path that looks like an asset reference goes via AssetDatabase.
+                    if (s.StartsWith("Assets/") || s.StartsWith("Packages/")) assetPath = s;
+                    else objectPath = s;
+                }
+
+                if (instanceId.HasValue)
+                {
+                    UnityEngine.Object resolved = EditorUtility.InstanceIDToObject(instanceId.Value);
+                    if (resolved == null) return null;
+                    if (targetType.IsAssignableFrom(resolved.GetType())) return resolved;
+                    if (resolved is GameObject go && typeof(Component).IsAssignableFrom(targetType))
+                    {
+                        Component c = go.GetComponent(targetType);
+                        if (c != null) return c;
+                    }
+                    return null;
+                }
+
+                // Asset reference (guid → path → load all + match by type/name).
+                if (!string.IsNullOrEmpty(guid) && string.IsNullOrEmpty(assetPath))
+                {
+                    assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                }
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    UnityEngine.Object asset = ResolveAsset(assetPath, targetType, subAssetName);
+                    if (asset != null) return asset;
+                }
+
+                if (!string.IsNullOrEmpty(objectPath))
+                {
+                    GameObject go = GameObject.Find(objectPath);
+                    if (go == null) return null;
+                    if (targetType == typeof(GameObject)) return go;
+                    if (targetType == typeof(Transform) || typeof(Transform).IsAssignableFrom(targetType))
+                        return go.transform;
+                    if (typeof(Component).IsAssignableFrom(targetType))
+                    {
+                        if (!string.IsNullOrEmpty(componentName))
+                        {
+                            Type t = ResolveComponentType(componentName, go);
+                            if (t != null) return go.GetComponent(t);
+                        }
+                        return go.GetComponent(targetType);
+                    }
+                }
+                return null;
+            }
+
+            // 2) Generic List<T>: recurse element-wise so nested UE.Object refs resolve.
+            if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(System.Collections.Generic.List<>))
+            {
+                Type elemType = targetType.GetGenericArguments()[0];
+                IList listInstance = (IList)Activator.CreateInstance(targetType);
+                if (value is JArray jArr)
+                {
+                    foreach (JToken item in jArr)
+                    {
+                        listInstance.Add(ConvertJsonToFieldValue(item, elemType));
+                    }
+                }
+                return listInstance;
+            }
+
+            // 3) Array: same idea.
+            if (targetType.IsArray)
+            {
+                Type elemType = targetType.GetElementType();
+                if (value is JArray jArr2)
+                {
+                    Array arr = Array.CreateInstance(elemType, jArr2.Count);
+                    for (int i = 0; i < jArr2.Count; i++)
+                    {
+                        arr.SetValue(ConvertJsonToFieldValue(jArr2[i], elemType), i);
+                    }
+                    return arr;
+                }
+                return null;
+            }
+
+            // 4) Plain POCO (incl. [Serializable] nested classes like SongLibrary.Entry).
+            //    Only recurse on user types — leave Unity built-ins (Vector3, Color, etc.) and primitives to Json.NET.
+            if (value is JObject jObj && targetType.IsClass && targetType != typeof(string) &&
+                !typeof(UnityEngine.Object).IsAssignableFrom(targetType) &&
+                !targetType.Namespace.StartsWith("UnityEngine", StringComparison.Ordinal))
+            {
+                object instance;
+                try { instance = Activator.CreateInstance(targetType); }
+                catch { return value.ToObject(targetType); }
+
+                foreach (var prop in jObj)
+                {
+                    FieldInfo f = FindFieldIncludingPrivate(targetType, prop.Key);
+                    if (f != null)
+                    {
+                        try { f.SetValue(instance, ConvertJsonToFieldValue(prop.Value, f.FieldType)); }
+                        catch { /* skip incompatible field */ }
+                    }
+                }
+                return instance;
+            }
+
+            // 5) Fallback to Json.NET for primitives, enums, structs, Vector3, etc.
+            return value.ToObject(targetType);
+        }
+
+        /// <summary>
+        /// Loads an asset from <paramref name="assetPath"/> matching <paramref name="targetType"/>.
+        /// If <paramref name="subAssetName"/> is non-empty, scans all sub-assets of the file and picks
+        /// the first one whose name matches. Otherwise picks the first asset assignable to targetType
+        /// (handles FBX → AnimationClip / Avatar / Mesh sub-asset cases without needing the fileID).
+        /// </summary>
+        private UnityEngine.Object ResolveAsset(string assetPath, Type targetType, string subAssetName)
+        {
+            // Fast path: main asset of matching type.
+            UnityEngine.Object main = AssetDatabase.LoadAssetAtPath(assetPath, targetType);
+            if (main != null && string.IsNullOrEmpty(subAssetName)) return main;
+
+            UnityEngine.Object[] all = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+            if (all == null || all.Length == 0) return main; // fall back to main if there are no sub-assets
+
+            // Named sub-asset takes priority when specified.
+            if (!string.IsNullOrEmpty(subAssetName))
+            {
+                foreach (UnityEngine.Object obj in all)
+                {
+                    if (obj == null) continue;
+                    if (obj.name != subAssetName) continue;
+                    if (targetType.IsAssignableFrom(obj.GetType())) return obj;
+                }
+            }
+
+            // Otherwise return the first sub-asset that fits the target type and isn't a private preview.
+            foreach (UnityEngine.Object obj in all)
+            {
+                if (obj == null) continue;
+                if (obj.name != null && obj.name.StartsWith("__preview__")) continue;
+                if (targetType.IsAssignableFrom(obj.GetType())) return obj;
+            }
+            return main;
         }
     }
 

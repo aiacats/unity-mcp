@@ -36,6 +36,7 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
         protected Type ResolveComponentType(string componentName, GameObject target = null)
         {
+            // Built-in Unity modules first.
             var type = Type.GetType($"UnityEngine.{componentName}, UnityEngine") ??
                        Type.GetType($"UnityEngine.{componentName}, UnityEngine.CoreModule") ??
                        Type.GetType($"UnityEngine.{componentName}, UnityEngine.PhysicsModule") ??
@@ -43,18 +44,48 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                        Type.GetType($"UnityEngine.{componentName}, UnityEngine.UIModule") ??
                        Type.GetType($"UnityEngine.{componentName}, UnityEngine.AnimationModule");
 
-            if (type == null && target != null)
+            if (type != null) return type;
+
+            // Already present on the GameObject (covers any namespace).
+            if (target != null)
             {
                 foreach (var comp in target.GetComponents<Component>())
                 {
-                    if (comp != null && comp.GetType().Name == componentName)
-                    {
-                        return comp.GetType();
-                    }
+                    if (comp == null) continue;
+                    var t = comp.GetType();
+                    if (t.Name == componentName || t.FullName == componentName) return t;
                 }
             }
 
-            return type;
+            // Search all loaded assemblies. Accepts simple name or fully qualified name.
+            var componentBase = typeof(Component);
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type candidate = null;
+                try
+                {
+                    candidate = asm.GetType(componentName, throwOnError: false, ignoreCase: false);
+                }
+                catch { /* ignore */ }
+                if (candidate != null && componentBase.IsAssignableFrom(candidate)) return candidate;
+
+                Type[] types;
+                try { types = asm.GetTypes(); }
+                catch (System.Reflection.ReflectionTypeLoadException ex)
+                {
+                    types = ex.Types;
+                }
+                catch { continue; }
+
+                foreach (var t in types)
+                {
+                    if (t == null) continue;
+                    if (!componentBase.IsAssignableFrom(t)) continue;
+                    if (t.Name == componentName || t.FullName == componentName) return t;
+                }
+            }
+
+            return null;
         }
 
         protected string CreateSuccessResponse(string type, object data)
