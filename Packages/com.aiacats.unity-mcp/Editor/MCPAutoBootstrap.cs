@@ -45,6 +45,16 @@ namespace ClaudeCodeMCP.Editor
             Debug.Log($"[Claude Code MCP] Auto install on Editor load: {(next ? "ENABLED" : "DISABLED")}");
         }
 
+        [MenuItem("Tools/Claude Code MCP/Debug: Toggle Verbose Request Log")]
+        private static void ToggleVerboseRequestLog()
+        {
+            const string key = "ClaudeCodeMCP.VerboseRequestLog";
+            bool next = !EditorPrefs.GetBool(key, false);
+            EditorPrefs.SetBool(key, next);
+            ClaudeCodeMCP.Editor.Core.MCPHttpServer.VerboseRequestLog = next;
+            Debug.Log($"[Claude Code MCP] Verbose request log: {(next ? "ENABLED" : "DISABLED")}");
+        }
+
         private static void TryInstall()
         {
             string serverPath = Path.GetFullPath(Path.Combine(PackageRelativePath, "Server~"));

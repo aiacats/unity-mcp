@@ -336,6 +336,85 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
+            name: 'wait_for_compilation_done',
+            description: 'Blocks until Unity finishes the current compilation, then returns the result snapshot. Use this instead of polling check_compilation_status. If Unity is not currently compiling, waits up to graceMs for one to start (handles the race after force_compilation/hot_reload), then returns immediately if no compile begins.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeoutMs: {
+                  type: 'number',
+                  default: 60000,
+                  description: 'Maximum time in milliseconds to wait for compilation to finish. Default 60000.'
+                },
+                graceMs: {
+                  type: 'number',
+                  default: 1500,
+                  description: 'If not currently compiling, time in milliseconds to wait for a compile to start before returning. Default 1500.'
+                }
+              }
+            }
+          },
+          {
+            name: 'build_player',
+            description: 'Triggers a Unity Player build asynchronously and returns immediately. Pair with wait_for_build_done to block until completion. Returns a snapshot of the build state.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                outputPath: {
+                  type: 'string',
+                  description: 'Absolute path to the player executable to write (e.g., D:/Builds/MyGame/MyGame.exe).'
+                },
+                target: {
+                  type: 'string',
+                  description: "Unity BuildTarget enum name. Common values: StandaloneWindows64, StandaloneOSX, StandaloneLinux64, Android, iOS, WebGL. Default StandaloneWindows64."
+                },
+                scenes: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional explicit scene paths (e.g., Assets/Scenes/Main.unity). If omitted, uses enabled scenes from EditorBuildSettings.'
+                },
+                development: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'If true, builds with BuildOptions.Development.'
+                },
+                autoRunPlayer: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'If true, launches the built player after a successful build.'
+                }
+              },
+              required: ['outputPath']
+            }
+          },
+          {
+            name: 'wait_for_build_done',
+            description: 'Blocks until the most recent build (started via build_player) finishes, then returns the full report. Always use this instead of polling get_build_status.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeoutMs: {
+                  type: 'number',
+                  default: 600000,
+                  description: 'Maximum time in milliseconds to wait. Default 600000 (10 min).'
+                },
+                pollMs: {
+                  type: 'number',
+                  default: 500,
+                  description: 'Internal polling interval in milliseconds. Default 500.'
+                }
+              }
+            }
+          },
+          {
+            name: 'get_build_status',
+            description: 'Returns the current build state (running flag, last report, errors). Use wait_for_build_done instead of polling this in a loop.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
             name: 'get_compilation_errors',
             description: 'Retrieves the latest compilation errors and warnings from Unity\'s compilation pipeline.',
             inputSchema: {

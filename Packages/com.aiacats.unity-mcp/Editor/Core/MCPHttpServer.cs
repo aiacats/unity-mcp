@@ -38,10 +38,15 @@ namespace ClaudeCodeMCP.Editor.Core
         private float _lastHealthCheckTime;
         private const float HealthCheckInterval = 10f;
 
+        // Cached verbose flag (EditorPrefs cannot be read off the main thread)
+        private const string VerboseRequestLogPrefsKey = "ClaudeCodeMCP.VerboseRequestLog";
+        internal static volatile bool VerboseRequestLog;
+
         // Shared state objects
         internal readonly CompilationState CompilationState = new CompilationState();
         internal readonly ConsoleLogState ConsoleLogState = new ConsoleLogState();
         internal readonly TestRunState TestRunState = new TestRunState();
+        internal readonly BuildState BuildState = new BuildState();
 
         // Request handlers
         private readonly Dictionary<string, IMCPHandler> _handlers = new Dictionary<string, IMCPHandler>();
@@ -112,6 +117,7 @@ namespace ClaudeCodeMCP.Editor.Core
 
         private MCPHttpServer()
         {
+            VerboseRequestLog = EditorPrefs.GetBool(VerboseRequestLogPrefsKey, false);
             RegisterHandlers();
 
             EditorApplication.quitting += OnEditorQuitting;
@@ -155,6 +161,12 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/force_compilation"] = new ForceCompilationHandler(this);
             _handlers["/mcp/tools/check_compilation_status"] = new CheckCompilationStatusHandler(this, CompilationState);
             _handlers["/mcp/tools/get_compilation_errors"] = new GetCompilationErrorsHandler(this, CompilationState);
+            _handlers["/mcp/tools/wait_for_compilation_done"] = new WaitForCompilationDoneHandler(this, CompilationState);
+
+            // Player build
+            _handlers["/mcp/tools/build_player"] = new BuildPlayerHandler(this, BuildState);
+            _handlers["/mcp/tools/wait_for_build_done"] = new WaitForBuildDoneHandler(this, BuildState);
+            _handlers["/mcp/tools/get_build_status"] = new GetBuildStatusHandler(this, BuildState);
 
             // Scene & Assets
             _handlers["/mcp/tools/save_scene"] = new SaveSceneHandler(this);
@@ -377,7 +389,10 @@ namespace ClaudeCodeMCP.Editor.Core
         {
             try
             {
-                Debug.Log($"[Claude Code MCP] Processing request: {path}");
+                if (VerboseRequestLog)
+                {
+                    Debug.Log($"[Claude Code MCP] Processing request: {path}");
+                }
 
                 if (path == "/mcp/ping")
                 {
@@ -425,6 +440,25 @@ namespace ClaudeCodeMCP.Editor.Core
         #endregion
 
         #region Main Thread Execution
+
+        /// <summary>
+        /// Fire-and-forget: enqueue an action to run on the Unity main thread without waiting for it.
+        /// Useful for kicking off long operations (e.g., player builds) from an HTTP handler.
+        /// </summary>
+        internal void EnqueueOnMainThread(Action action)
+        {
+            if (action == null) return;
+            lock (_queueLock)
+            {
+                _mainThreadQueue.Enqueue(() =>
+                {
+                    try { action(); }
+                    catch (Exception ex) { Debug.LogError($"[Claude Code MCP] Enqueued main-thread action threw: {ex}"); }
+                });
+            }
+            // Hint Unity to tick its player loop so the queued action runs even when the editor is unfocused.
+            EditorApplication.QueuePlayerLoopUpdate();
+        }
 
         internal string ExecuteOnMainThreadWithResult(Func<string> function, int timeoutMs = 5000)
         {

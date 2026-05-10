@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -228,6 +229,109 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
         public override string Handle(string requestBody)
         {
             return CreateSuccessResponse("compilation_errors", _state.GetErrorsSnapshot());
+        }
+    }
+
+    /// <summary>
+    /// Blocks the request until Unity finishes the current compilation, then returns the result snapshot.
+    /// If Unity is not currently compiling, waits up to graceMs for one to start (handles the race where
+    /// the caller just triggered force_compilation), and returns immediately if no compile begins.
+    /// Avoids the need for client-side polling of check_compilation_status.
+    /// </summary>
+    internal class WaitForCompilationDoneHandler : HandlerBase
+    {
+        private readonly CompilationState _state;
+
+        public WaitForCompilationDoneHandler(MCPHttpServer server, CompilationState state) : base(server)
+        {
+            _state = state;
+        }
+
+        public override string Handle(string requestBody)
+        {
+            int timeoutMs = 60000;
+            int graceMs = 1500;
+            if (!string.IsNullOrEmpty(requestBody))
+            {
+                try
+                {
+                    var req = JObject.Parse(requestBody);
+                    timeoutMs = req["timeoutMs"]?.ToObject<int?>() ?? timeoutMs;
+                    graceMs = req["graceMs"]?.ToObject<int?>() ?? graceMs;
+                }
+                catch (JsonReaderException) { /* defaults */ }
+            }
+
+            var doneEvent = new ManualResetEventSlim(false);
+            Action<object> onFinished = null;
+            onFinished = _ =>
+            {
+                CompilationPipeline.compilationFinished -= onFinished;
+                doneEvent.Set();
+            };
+
+            bool wasCompiling = false;
+            ExecuteOnMainThread(() =>
+            {
+                CompilationPipeline.compilationFinished += onFinished;
+                wasCompiling = EditorApplication.isCompiling;
+                return "ok";
+            });
+
+            if (!wasCompiling)
+            {
+                Thread.Sleep(graceMs);
+                bool startedAfterGrace = false;
+                ExecuteOnMainThread(() =>
+                {
+                    startedAfterGrace = EditorApplication.isCompiling;
+                    return "ok";
+                });
+                if (!startedAfterGrace)
+                {
+                    ExecuteOnMainThread(() =>
+                    {
+                        CompilationPipeline.compilationFinished -= onFinished;
+                        return "ok";
+                    });
+                    return BuildResponse(wasCompiling: false, timedOut: false, waitedMs: graceMs);
+                }
+                wasCompiling = true;
+            }
+
+            var startTime = DateTime.Now;
+            bool gotIt = doneEvent.Wait(timeoutMs);
+            var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
+
+            if (!gotIt)
+            {
+                ExecuteOnMainThread(() =>
+                {
+                    CompilationPipeline.compilationFinished -= onFinished;
+                    return "ok";
+                });
+            }
+
+            return BuildResponse(wasCompiling: wasCompiling, timedOut: !gotIt, waitedMs: (long)elapsed);
+        }
+
+        private string BuildResponse(bool wasCompiling, bool timedOut, long waitedMs)
+        {
+            return ExecuteOnMainThread(() =>
+            {
+                var result = new JObject
+                {
+                    ["wasCompiling"] = wasCompiling,
+                    ["isCompiling"] = EditorApplication.isCompiling,
+                    ["timedOut"] = timedOut,
+                    ["waitedMs"] = waitedMs,
+                    ["timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                };
+                var stateSnapshot = _state.GetStatusSnapshot();
+                foreach (var prop in stateSnapshot.Properties())
+                    result[prop.Name] = prop.Value;
+                return CreateSuccessResponse("compilation_done", result);
+            });
         }
     }
 }
