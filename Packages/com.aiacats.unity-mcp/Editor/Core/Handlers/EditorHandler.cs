@@ -51,6 +51,9 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
         public override string Handle(string requestBody)
         {
+            // Client.Add はメインスレッド必須。listener スレッドから呼ぶと例外になるため必ずラップする。
+            return ExecuteOnMainThread(() =>
+            {
             var request = JObject.Parse(requestBody);
             string source = request["source"]?.ToString();
 
@@ -95,7 +98,43 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             }
 
             UnityEditor.PackageManager.Client.Add(packageId);
-            return CreateSuccessResponse("package_added", $"Package {packageId} added to Package Manager");
+            return CreateSuccessResponse("package_added", $"Package {packageId} added to Package Manager (resolving asynchronously)");
+            });
+        }
+    }
+
+    /// <summary>パッケージを削除する(Client.Remove、メインスレッド)。</summary>
+    internal class RemovePackageHandler : HandlerBase
+    {
+        public RemovePackageHandler(MCPHttpServer server) : base(server) { }
+
+        public override string Handle(string requestBody)
+        {
+            return ExecuteOnMainThread(() =>
+            {
+                var request = JObject.Parse(string.IsNullOrEmpty(requestBody) ? "{}" : requestBody);
+                string packageName = request["packageName"]?.ToString();
+                if (string.IsNullOrEmpty(packageName))
+                    return CreateErrorResponse("missing_package_name", "packageName is required");
+
+                UnityEditor.PackageManager.Client.Remove(packageName);
+                return CreateSuccessResponse("package_removed", $"Package {packageName} removal requested (resolving asynchronously)");
+            });
+        }
+    }
+
+    /// <summary>manifest からパッケージを再解決する(Client.Resolve、メインスレッド)。</summary>
+    internal class ResolvePackagesHandler : HandlerBase
+    {
+        public ResolvePackagesHandler(MCPHttpServer server) : base(server) { }
+
+        public override string Handle(string requestBody)
+        {
+            return ExecuteOnMainThread(() =>
+            {
+                UnityEditor.PackageManager.Client.Resolve();
+                return CreateSuccessResponse("packages_resolving", "Package resolution requested via Client.Resolve()");
+            });
         }
     }
 

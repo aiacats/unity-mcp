@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-01
+
+### Added
+- **Play モード制御ツール**（フォーカス非依存）: `enter_play_mode` / `exit_play_mode` / `get_play_state`。
+  `EditorApplication.isPlaying` をメインスレッドで操作するため、ウィンドウフォーカスやリモートデスクトップに
+  左右されず確実に Play/Stop できる（`Ctrl+P` 送出の代替）。`Editor/Core/Handlers/PlayAndViewHandlers.cs`。
+- **Game View Display 切替ツール**: `set_game_view_display`（0-based、0 = Display 1）。GameView 内部 API を
+  リフレクションで操作し、UIDocument/PanelSettings や特定カメラが対象とする Display へ Game View を合わせられる。
+- **パッケージ解決ツール**: `remove_package`（`Client.Remove`）/ `resolve_packages`（`Client.Resolve`）を追加。
+  `add_package` を**メインスレッド実行に修正**（従来は listener スレッドから `Client.Add` を呼んで
+  "Add can only be called from the main thread" で失敗していた）。manifest 外部編集後の再解決が、
+  packages-lock.json 削除や Editor 再起動なしで行える。
+- **`restart_editor`**: 現在のプロジェクトで Editor を再起動（`EditorApplication.OpenProject`）。
+- **`clear_console`**: コンソールログのクリア（`UnityEditor.LogEntries.Clear`）。
+
+### Removed
+- **`screenshot` ツールを削除**。スクリーンショット系機能は WinGui MCP に委譲する方針のため、Unity MCP からは
+  ツール定義（Server~/index.js）とハンドラ登録（MCPHttpServer）を撤去（Node 側の image 返却特別処理も削除）。
+
 ## [1.1.0] - 2026-04-29
 
 ### Added

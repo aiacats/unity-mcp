@@ -177,12 +177,22 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/create_material"] = new CreateMaterialHandler(this);
             _handlers["/mcp/tools/get_material_properties"] = new GetMaterialPropertiesHandler(this);
             _handlers["/mcp/tools/set_material_property"] = new SetMaterialPropertyHandler(this);
-            _handlers["/mcp/tools/screenshot"] = new ScreenshotHandler(this);
+            // NOTE: screenshot は WinGui MCP に委譲したため Unity MCP からは削除。
 
             // Editor control
             _handlers["/mcp/tools/execute_menu_item"] = new ExecuteMenuItemHandler(this);
             _handlers["/mcp/tools/add_package"] = new AddPackageHandler(this);
+            _handlers["/mcp/tools/remove_package"] = new RemovePackageHandler(this);
+            _handlers["/mcp/tools/resolve_packages"] = new ResolvePackagesHandler(this);
             _handlers["/mcp/tools/run_tests"] = new RunTestsHandler(this, TestRunState);
+
+            // Play mode control (focus-independent; uses EditorApplication.isPlaying on main thread)
+            _handlers["/mcp/tools/enter_play_mode"] = new EnterPlayModeHandler(this);
+            _handlers["/mcp/tools/exit_play_mode"] = new ExitPlayModeHandler(this);
+            _handlers["/mcp/tools/get_play_state"] = new GetPlayStateHandler(this);
+            _handlers["/mcp/tools/set_game_view_display"] = new SetGameViewDisplayHandler(this);
+            _handlers["/mcp/tools/restart_editor"] = new RestartEditorHandler(this);
+            _handlers["/mcp/tools/clear_console"] = new ClearConsoleHandler(this);
         }
 
         #region Server Lifecycle

@@ -182,7 +182,7 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'add_package',
-            description: 'Adds packages into the Unity Package Manager',
+            description: 'Adds a package to the Unity Package Manager (UnityEditor.PackageManager.Client.Add, run on the main thread). Resolution is asynchronous; use wait_for_compilation_done or get_compilation_errors afterwards.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -212,6 +212,28 @@ class ClaudeCodeMCPUnityServer {
                 }
               },
               required: ['source']
+            }
+          },
+          {
+            name: 'remove_package',
+            description: 'Removes a package from the Unity Package Manager (Client.Remove, main thread). Resolution is asynchronous.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                packageName: {
+                  type: 'string',
+                  description: 'The package name to remove (e.g. com.cysharp.r3)'
+                }
+              },
+              required: ['packageName']
+            }
+          },
+          {
+            name: 'resolve_packages',
+            description: 'Forces Unity to re-resolve packages from the manifest (Client.Resolve, main thread). Use after editing Packages/manifest.json externally so changes are picked up without deleting packages-lock.json or restarting.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
             }
           },
           {
@@ -333,6 +355,60 @@ class ClaudeCodeMCPUnityServer {
             inputSchema: {
               type: 'object',
               properties: {}
+            }
+          },
+          {
+            name: 'enter_play_mode',
+            description: 'Enters Play Mode in the Unity Editor. Does not depend on window focus (uses EditorApplication.isPlaying on the main thread), so it works headless/unfocused. Refuses while compiling or already playing.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'exit_play_mode',
+            description: 'Exits Play Mode in the Unity Editor (returns to Edit Mode). Focus-independent.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'get_play_state',
+            description: 'Returns the current Editor play state (isPlaying, isPaused, isCompiling).',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'restart_editor',
+            description: 'Restarts the Unity Editor on the current project (EditorApplication.OpenProject). The MCP server drops and returns after Unity relaunches. Useful after manifest/package changes that need a clean reload.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'clear_console',
+            description: 'Clears the Unity Editor console logs.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'set_game_view_display',
+            description: 'Changes which Display the Game View renders (the "Display 1/2/..." dropdown). Useful when a UIDocument/PanelSettings or camera targets a specific display. display is 0-based (0 = Display 1).',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                display: {
+                  type: 'integer',
+                  default: 0,
+                  description: '0-based display index (0 = Display 1, 1 = Display 2, ...).'
+                }
+              }
             }
           },
           {
@@ -633,19 +709,6 @@ class ClaudeCodeMCPUnityServer {
                 }
               }
             }
-          },
-          {
-            name: 'screenshot',
-            description: 'Captures a screenshot of the entire Unity Editor window (including Hierarchy, Inspector, Scene/Game view, Console, etc.) using Windows API. Returns the image directly for visual inspection. Only supported on Windows.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                savePath: {
-                  type: 'string',
-                  description: 'Path to save the screenshot (e.g. "Assets/Screenshots/shot.png"). Default: auto-generated with timestamp'
-                }
-              }
-            }
           }
         ]
       };
@@ -715,23 +778,6 @@ class ClaudeCodeMCPUnityServer {
 
         const data = await response.json();
         console.error(`[MCP Unity] Tool response for: ${name}`);
-
-        // Return screenshot as image content for visual inspection
-        if (name === 'screenshot' && data.success && data.data?.base64) {
-          const { base64, ...meta } = data.data;
-          const content = [
-            {
-              type: 'image',
-              data: base64,
-              mimeType: 'image/png'
-            },
-            {
-              type: 'text',
-              text: JSON.stringify({ ...data, data: meta }, null, 2)
-            }
-          ];
-          return { content };
-        }
 
         return {
           content: [
