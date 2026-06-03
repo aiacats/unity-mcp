@@ -197,6 +197,9 @@ namespace ClaudeCodeMCP.Editor.Core
 
         #region Server Lifecycle
 
+        // 起動失敗ログを一度だけ出すためのフラグ（ヘルスチェックの再試行による LogError 連発を抑止）。
+        private bool _startFailureReported;
+
         public void StartServer()
         {
             if (_isRunning && _httpListener != null && _httpListener.IsListening)
@@ -220,6 +223,7 @@ namespace ClaudeCodeMCP.Editor.Core
                 _httpListener.Prefixes.Add($"http://+:{_port}/");
                 _httpListener.Start();
                 _isRunning = true;
+                _startFailureReported = false;
 
                 Debug.Log($"[Claude Code MCP] HTTP Server started on port {_port}");
 
@@ -234,9 +238,12 @@ namespace ClaudeCodeMCP.Editor.Core
             {
                 TryStartAlternativePort();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.LogError($"[Claude Code MCP] Failed to start server: {ex.Message}");
+                // ポート使用中(EADDRINUSE)等が HttpListenerException 以外の例外で来る場合も、
+                // HttpListenerException と同様に代替ポートで回復を試みる。
+                // （ヘルスチェックの再試行で毎フレーム LogError を連発しないため）
+                TryStartAlternativePort();
             }
         }
 
@@ -255,6 +262,7 @@ namespace ClaudeCodeMCP.Editor.Core
 
                     _port = port;
                     _isRunning = true;
+                    _startFailureReported = false;
 
                     Debug.Log($"[Claude Code MCP] HTTP Server started on alternative port {port}");
 
@@ -273,7 +281,13 @@ namespace ClaudeCodeMCP.Editor.Core
                 }
             }
 
-            Debug.LogError("[Claude Code MCP] Failed to start server on any port between 8090-8099");
+            // 全ポート(8090-8099)使用中。ヘルスチェックで毎フレーム再試行されるため、一度だけ警告する
+            // （成功時に _startFailureReported がリセットされ、再発時は再度通知される）。
+            if (!_startFailureReported)
+            {
+                Debug.LogWarning("[Claude Code MCP] Could not bind any port between 8090-8099 (all in use). Retrying silently.");
+                _startFailureReported = true;
+            }
         }
 
         public void StopServer() => StopServerInternal(false);
