@@ -251,7 +251,10 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 object targetInstance = null;
                 if (targetToken != null && targetToken.Type != JTokenType.Null)
                 {
-                    targetInstance = MCPReflection.ResolveUnityObject(targetToken, typeof(UnityEngine.Object));
+                    // インスタンスメソッドの target は宣言型(type)をヒントに解決する
+                    // （type が Component なら objectPath→GameObject→GetComponent(type) で解決される）。
+                    var targetHint = typeof(UnityEngine.Object).IsAssignableFrom(type) ? type : typeof(UnityEngine.Object);
+                    targetInstance = MCPReflection.ResolveUnityObject(targetToken, targetHint);
                     if (targetInstance == null)
                         return CreateErrorResponse("target_not_found", "Could not resolve 'target' instance");
                 }
