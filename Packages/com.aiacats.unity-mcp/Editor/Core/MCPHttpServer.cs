@@ -193,6 +193,11 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/set_game_view_display"] = new SetGameViewDisplayHandler(this);
             _handlers["/mcp/tools/restart_editor"] = new RestartEditorHandler(this);
             _handlers["/mcp/tools/clear_console"] = new ClearConsoleHandler(this);
+
+            // Automation (generic reflection / asset primitives)
+            _handlers["/mcp/tools/invoke_method"] = new InvokeMethodHandler(this);
+            _handlers["/mcp/tools/create_asset"] = new CreateAssetHandler(this);
+            _handlers["/mcp/tools/set_object_properties"] = new SetObjectPropertiesHandler(this);
         }
 
         #region Server Lifecycle

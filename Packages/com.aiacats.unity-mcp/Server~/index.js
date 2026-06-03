@@ -709,6 +709,81 @@ class ClaudeCodeMCPUnityServer {
                 }
               }
             }
+          },
+          {
+            name: 'invoke_method',
+            description: 'Invokes a static or instance method via reflection (generic editor-automation primitive). Use it to call project-side editor routines such as build/migration helpers (e.g. a class that uses PrefabUtility.LoadPrefabContents/SaveAsPrefabAsset), VcamRigBuilder.Generate, etc. Method arguments are JSON values converted to the parameter types, including UnityEngine.Object references resolved by instanceId / assetPath / guid / objectPath. WARNING: this can run arbitrary editor code; intended for trusted local development only.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                typeName: {
+                  type: 'string',
+                  description: 'Fully-qualified or simple type name declaring the method (e.g. "vortex.VcamRigBuilder" or "VcamRigBuilder")'
+                },
+                methodName: {
+                  type: 'string',
+                  description: 'The method name to invoke. Overloads are disambiguated by the number of args.'
+                },
+                args: {
+                  type: 'array',
+                  description: 'Ordered method arguments as JSON values. Primitives/enums/Vector3/etc. convert directly; objects with {instanceId|assetPath|guid|objectPath[,componentName]} resolve to UnityEngine.Object references.',
+                  items: {}
+                },
+                target: {
+                  description: 'For instance methods: the object the method is called on, given as instanceId (number) or {instanceId|assetPath|guid|objectPath[,componentName]}. Omit for static methods.'
+                }
+              },
+              required: ['typeName', 'methodName']
+            }
+          },
+          {
+            name: 'create_asset',
+            description: 'Creates a ScriptableObject asset (ScriptableObject.CreateInstance + AssetDatabase.CreateAsset) at the given project path, optionally setting initial field values. Returns the created asset path and GUID.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                typeName: {
+                  type: 'string',
+                  description: 'Fully-qualified or simple ScriptableObject type name (e.g. "vortex.CameraRigProfile")'
+                },
+                path: {
+                  type: 'string',
+                  description: 'Destination asset path, must start with "Assets/" or "Packages/" (e.g. "Assets/Profiles/Cam01.asset")'
+                },
+                data: {
+                  type: 'object',
+                  description: 'Optional initial field values. Same value semantics as update_component (UnityEngine.Object refs, nested lists/POCOs supported).'
+                },
+                unique: {
+                  type: 'boolean',
+                  description: 'If true (default), GenerateUniqueAssetPath avoids overwriting an existing asset at path.'
+                }
+              },
+              required: ['typeName', 'path']
+            }
+          },
+          {
+            name: 'set_object_properties',
+            description: 'Sets fields/properties on any UnityEngine.Object — a component OR a standalone asset (e.g. a ScriptableObject). Generalizes update_component to assets. Resolves object references / nested lists / POCOs the same way update_component does, records Undo, marks dirty, and saves the asset if it is on disk.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                target: {
+                  description: 'The object to modify, given as instanceId (number) or {instanceId|assetPath|guid|objectPath[,componentName]}. May also be supplied via the top-level instanceId/assetPath/guid/objectPath fields.'
+                },
+                instanceId: { type: 'number', description: 'Target by instance ID (alternative to target).' },
+                assetPath: { type: 'string', description: 'Target an asset by path (alternative to target).' },
+                guid: { type: 'string', description: 'Target an asset by GUID (alternative to target).' },
+                objectPath: { type: 'string', description: 'Target a scene GameObject by path (alternative to target).' },
+                componentName: { type: 'string', description: 'When objectPath resolves a GameObject, pick this component as the target.' },
+                typeName: { type: 'string', description: 'Optional type hint used when loading an asset by path/guid.' },
+                data: {
+                  type: 'object',
+                  description: 'Object of field/property names to values. Same value semantics as update_component.'
+                }
+              },
+              required: ['data']
+            }
           }
         ]
       };

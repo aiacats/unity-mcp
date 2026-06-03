@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-03
+
+### Added
+- **汎用エディタ自動化ツール 3 種**（`Editor/Core/Handlers/AutomationHandlers.cs`）。
+  これにより、専用ハンドラを増やさずに ScriptableObject 生成・任意オブジェクト/アセットの
+  フィールド設定・プロジェクト側エディタルーチンの起動が MCP から行える。
+  - `invoke_method`: 任意の static / instance メソッドをリフレクション呼び出し。引数は JSON 値を
+    パラメータ型へ変換（`instanceId` / `assetPath` / `guid` / `objectPath` による UnityEngine.Object 解決を含む）。
+    prefab 編集（`PrefabUtility.LoadPrefabContents`/`SaveAsPrefabAsset`）などはプロジェクト側ルーチンを
+    本ツールで起動する形を想定。**任意エディタコードを実行しうるためローカル開発専用**。
+  - `create_asset`: `ScriptableObject.CreateInstance` + `AssetDatabase.CreateAsset`。初期フィールド値の設定可。
+  - `set_object_properties`: `update_component` をアセットにも一般化。コンポーネント／単体アセット双方の
+    フィールド・プロパティを設定（参照・ネスト List/POCO 対応、Undo 記録、ディスク上アセットは保存）。
+  - JSON→型付き値変換ロジックを `MCPReflection` 静的ユーティリティに共有化。
+
 ## [1.2.0] - 2026-06-01
 
 ### Added
