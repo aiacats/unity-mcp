@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Text;
 using System.IO;
@@ -47,6 +47,7 @@ namespace ClaudeCodeMCP.Editor.Core
         internal readonly ConsoleLogState ConsoleLogState = new ConsoleLogState();
         internal readonly TestRunState TestRunState = new TestRunState();
         internal readonly BuildState BuildState = new BuildState();
+        internal readonly ExportState ExportState = new ExportState();
 
         // Request handlers
         private readonly Dictionary<string, IMCPHandler> _handlers = new Dictionary<string, IMCPHandler>();
@@ -167,6 +168,12 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/build_player"] = new BuildPlayerHandler(this, BuildState);
             _handlers["/mcp/tools/wait_for_build_done"] = new WaitForBuildDoneHandler(this, BuildState);
             _handlers["/mcp/tools/get_build_status"] = new GetBuildStatusHandler(this, BuildState);
+
+            // .unitypackage export (async like the player build; compressing a large tree
+            // takes longer than an MCP request will wait)
+            _handlers["/mcp/tools/export_package"] = new ExportPackageHandler(this, ExportState);
+            _handlers["/mcp/tools/wait_for_export_done"] = new WaitForExportDoneHandler(this, ExportState);
+            _handlers["/mcp/tools/get_export_status"] = new GetExportStatusHandler(this, ExportState);
 
             // Scene & Assets
             _handlers["/mcp/tools/save_scene"] = new SaveSceneHandler(this);

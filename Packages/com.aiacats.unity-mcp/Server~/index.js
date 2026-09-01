@@ -491,6 +491,67 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
+            name: 'export_package',
+            description: 'Exports asset paths to a .unitypackage. Starts asynchronously and returns immediately - follow it with wait_for_export_done. Dependency collection is off by default so the package contains exactly what was asked for.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                outputPath: {
+                  type: 'string',
+                  description: 'Absolute path of the .unitypackage to write (e.g., D:/Export/MyPackage.unitypackage). Missing directories are created.'
+                },
+                assetPaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Project-relative paths to export - folders or individual assets (e.g., ["Assets/MyFolder", "Assets/Other/Thing.prefab"]).'
+                },
+                excludePaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Project-relative paths to leave out. A folder here drops everything beneath it. Requires recurse=true.'
+                },
+                recurse: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include the contents of the folders in assetPaths. Default true.'
+                },
+                includeDependencies: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Also pull in every asset the selection references. Default false, because it makes the resulting contents hard to predict.'
+                }
+              },
+              required: ['outputPath', 'assetPaths']
+            }
+          },
+          {
+            name: 'wait_for_export_done',
+            description: 'Blocks until the most recent export (started via export_package) finishes, then returns the result including the written file size. Always use this instead of polling get_export_status.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeoutMs: {
+                  type: 'number',
+                  default: 600000,
+                  description: 'Maximum time in milliseconds to wait. Default 600000 (10 min).'
+                },
+                pollMs: {
+                  type: 'number',
+                  default: 500,
+                  description: 'Internal polling interval in milliseconds. Default 500.'
+                }
+              }
+            }
+          },
+          {
+            name: 'get_export_status',
+            description: 'Returns the current .unitypackage export state (running flag, output path, size). Use wait_for_export_done instead of polling this in a loop.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
             name: 'get_compilation_errors',
             description: 'Retrieves the latest compilation errors and warnings from Unity\'s compilation pipeline.',
             inputSchema: {
