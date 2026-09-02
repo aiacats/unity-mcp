@@ -65,7 +65,7 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'update_gameobject',
-            description: 'Updates properties of a GameObject in the Unity scene by its instance ID or path. If the GameObject does not exist at the specified path, it will be created.',
+            description: 'Updates properties of a GameObject in the Unity scene by its instance ID or path. Finds inactive objects too. Fails if the object does not exist unless createIfMissing is true. The active-state field is activeSelf (not isActive); unknown fields are rejected rather than ignored.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -76,6 +76,11 @@ class ClaudeCodeMCPUnityServer {
                 instanceId: {
                   type: 'number',
                   description: 'The instance ID of the GameObject to update'
+                },
+                createIfMissing: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Create the GameObject at objectPath when it does not exist. Off by default so a wrong path fails loudly instead of leaving a stray empty object in the scene.'
                 },
                 gameObjectData: {
                   type: 'object',

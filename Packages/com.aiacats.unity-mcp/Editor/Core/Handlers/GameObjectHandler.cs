@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using Newtonsoft.Json.Linq;
@@ -102,21 +103,49 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 if (gameObjectData == null)
                     return CreateErrorResponse("missing_parameter", "gameObjectData is required");
 
+                // 知らないキーは弾く。綴り違い(isActive と activeSelf など)を黙って捨てて
+                // success を返すと、呼び出し側は反映されたものとして次へ進んでしまう
+                var known = new HashSet<string>
+                {
+                    "name", "activeSelf", "tag", "layer", "isStatic",
+                    "parentPath", "parentInstanceId", "siblingIndex",
+                };
+                var unknown = new List<string>();
+                foreach (var kv in gameObjectData)
+                {
+                    if (!known.Contains(kv.Key)) unknown.Add(kv.Key);
+                }
+                if (unknown.Count > 0)
+                {
+                    return CreateErrorResponse("unknown_field",
+                        $"Unknown field(s) in gameObjectData: {string.Join(", ", unknown)}. "
+                        + $"Supported: {string.Join(", ", known)}. "
+                        + "(Note: the active state field is 'activeSelf', not 'isActive'.)");
+                }
+
                 GameObject target = FindGameObject(request);
                 bool isNew = false;
 
                 if (target == null)
                 {
                     string objectPath = request["objectPath"]?.ToString();
-                    if (!string.IsNullOrEmpty(objectPath))
+
+                    // 作成は明示的に頼まれたときだけ。更新のつもりのパス違いで
+                    // 同名の空オブジェクトがシーンに紛れ込むのが一番たちが悪い
+                    bool createIfMissing = request["createIfMissing"]?.ToObject<bool>() ?? false;
+
+                    if (string.IsNullOrEmpty(objectPath))
                     {
-                        target = CreateGameObjectAtPath(objectPath);
-                        isNew = true;
+                        return CreateErrorResponse("gameobject_not_found", "GameObject not found and no objectPath given.");
                     }
-                    else
+                    if (!createIfMissing)
                     {
-                        return CreateErrorResponse("gameobject_not_found", "GameObject not found and no objectPath to create");
+                        return CreateErrorResponse("gameobject_not_found",
+                            $"GameObject not found: {objectPath}. Pass createIfMissing=true to create it.");
                     }
+
+                    target = CreateGameObjectAtPath(objectPath);
+                    isNew = true;
                 }
 
                 if (!isNew) Undo.RecordObject(target, "Update GameObject via MCP");

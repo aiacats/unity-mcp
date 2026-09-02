@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
@@ -16,7 +17,9 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             return ExecuteOnMainThread(() => {
                 var request = JObject.Parse(requestBody);
                 string componentName = request["componentName"]?.ToString();
-                var componentData = request["componentData"] as JObject;
+                // "properties" でも受ける。ツール宣言は componentData だが、
+                // 名前を取り違えた呼び出しが黙って何もせず成功するのを避ける
+                var componentData = (request["componentData"] ?? request["properties"]) as JObject;
 
                 var target = FindGameObject(request);
                 if (target == null)
@@ -35,38 +38,71 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
                 Undo.RecordObject(component, "Update Component via MCP");
 
+                var applied = new List<string>();
+                var failed = new List<string>();
+
                 if (componentData != null)
                 {
                     foreach (var property in componentData)
                     {
+                        // Inspector に出る m_Enabled / m_Name のような直列化名で来ることがある。
+                        // リフレクションで見えるのは enabled / name なので読み替える
+                        string key = property.Key;
+                        if (key.Length > 2 && key.StartsWith("m_"))
+                        {
+                            string stripped = char.ToLowerInvariant(key[2]) + key.Substring(3);
+                            if (FindFieldIncludingPrivate(componentType, key) == null &&
+                                componentType.GetProperty(key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) == null)
+                            {
+                                key = stripped;
+                            }
+                        }
+
                         try
                         {
-                            FieldInfo field = FindFieldIncludingPrivate(componentType, property.Key);
-                            PropertyInfo prop = componentType.GetProperty(property.Key,
+                            FieldInfo field = FindFieldIncludingPrivate(componentType, key);
+                            PropertyInfo prop = componentType.GetProperty(key,
                                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
                             if (field != null)
                             {
                                 field.SetValue(component, ConvertJsonToFieldValue(property.Value, field.FieldType));
+                                applied.Add(property.Key);
                             }
                             else if (prop != null && prop.CanWrite)
                             {
                                 prop.SetValue(component, ConvertJsonToFieldValue(property.Value, prop.PropertyType));
+                                applied.Add(property.Key);
                             }
                             else
                             {
-                                Debug.LogWarning($"[Claude Code MCP] No writable field/property '{property.Key}' on {componentType.Name}");
+                                failed.Add($"{property.Key} (no writable field/property on {componentType.Name})");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogWarning($"[Claude Code MCP] Failed to set {property.Key}: {ex.Message}");
+                            failed.Add($"{property.Key} ({ex.Message})");
                         }
                     }
                 }
 
                 EditorUtility.SetDirty(target);
-                return CreateSuccessResponse("component_updated", $"Updated {componentName} on {target.name}");
+
+                // 1 つも通らなかったのに success を返すと、呼び出し側は反映されたと信じて先に進む
+                if (failed.Count > 0 && applied.Count == 0)
+                {
+                    return CreateErrorResponse("no_property_applied",
+                        $"None of the given properties could be set on {componentName}: {string.Join("; ", failed)}");
+                }
+
+                var result = new JObject
+                {
+                    ["message"] = $"Updated {componentName} on {target.name}",
+                    ["applied"] = new JArray(applied),
+                };
+                if (failed.Count > 0) result["failed"] = new JArray(failed);
+
+                return CreateSuccessResponse("component_updated", result);
             });
         }
 

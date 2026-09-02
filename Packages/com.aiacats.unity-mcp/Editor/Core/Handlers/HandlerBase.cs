@@ -28,10 +28,50 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
 
             if (!string.IsNullOrEmpty(objectPath))
             {
-                return GameObject.Find(objectPath);
+                // GameObject.Find は有効なオブジェクトしか返さない。非アクティブを掴めないと
+                // 「一度無効にしたら二度と戻せない」うえ、呼び出し側が「存在しない」と誤解する
+                return GameObject.Find(objectPath) ?? FindIncludingInactive(objectPath);
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 読み込み済みの全シーンを走査して、パスまたは名前で GameObject を探す。
+        /// 非アクティブも対象。パス指定が一致したものを優先し、無ければ末尾の名前で拾う。
+        /// </summary>
+        protected static GameObject FindIncludingInactive(string objectPath)
+        {
+            if (string.IsNullOrEmpty(objectPath)) return null;
+
+            string wanted = objectPath.TrimStart('/');
+            string leaf = wanted.Contains("/") ? wanted.Substring(wanted.LastIndexOf('/') + 1) : wanted;
+
+            GameObject byLeaf = null;
+
+            for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+            {
+                var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                if (!scene.isLoaded) continue;
+
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (GetPath(t).TrimStart('/') == wanted) return t.gameObject;
+                        if (byLeaf == null && t.name == leaf) byLeaf = t.gameObject;
+                    }
+                }
+            }
+
+            return byLeaf;
+        }
+
+        static string GetPath(Transform t)
+        {
+            string path = t.name;
+            for (Transform p = t.parent; p != null; p = p.parent) path = p.name + "/" + path;
+            return path;
         }
 
         protected Type ResolveComponentType(string componentName, GameObject target = null)
