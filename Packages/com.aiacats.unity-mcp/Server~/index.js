@@ -4,13 +4,45 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListResourcesRequestSchema, ListToolsRequestSchema, ReadResourceRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const NEWLINE = String.fromCharCode(10);
+
+/** 区切りを "/" に統一し末尾の区切りを落とす。Unity 側 MCPEndpointFile と同じ規則。 */
+function normalizePath(p) {
+  let r = path.resolve(p).split(path.sep).join('/');
+  while (r.endsWith('/')) r = r.slice(0, -1);
+  return r;
+}
+
+/**
+ * この index.js の位置から上方向へ Unity プロジェクトルートを探す。
+ * Packages/ 配下でも Assets/ 配下でも同じように見つかる。
+ * 打ち切りはファイルシステムのルートに到達したときで、階層数は決め打ちしない。
+ */
+function findUnityProjectRoot(start) {
+  let dir = path.resolve(start);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, 'ProjectSettings', 'ProjectVersion.txt'))) return normalizePath(dir);
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 /**
  * Claude Code MCP Unity Server
  * Connects to Unity Editor via HTTP REST API
  */
 class ClaudeCodeMCPUnityServer {
   constructor() {
-    this.unityUrl = process.env.MCP_UNITY_HTTP_URL || 'http://localhost:8090';
+    // Unity は 8090 が埋まっていれば 8091.. へ逃げる。固定値で繋ぐと、複数プロジェクトを
+    // 同時に開いたときに「別プロジェクトの Unity」を操作してしまうため、接続先は
+    // 毎回 endpoint.json から解決し、identity で照合する（getUnityUrl / verifyIdentity）。
+    this.projectRoot = findUnityProjectRoot(HERE);
     this.server = new Server(
       {
         name: 'claude-code-mcp-unity',
@@ -25,6 +57,82 @@ class ClaudeCodeMCPUnityServer {
     );
 
     this.setupHandlers();
+  }
+
+  /** Unity が実際にバインドしたポートを書き出す受け渡しファイル。 */
+  endpointFilePath() {
+    if (!this.projectRoot) return null;
+    return path.join(this.projectRoot, 'Library', 'ClaudeCodeMCP', 'endpoint.json');
+  }
+
+  readEndpoint() {
+    const f = this.endpointFilePath();
+    if (!f) return null;
+    try {
+      return JSON.parse(fs.readFileSync(f, 'utf8'));
+    } catch {
+      return null;   // 未起動・書き込み途中はここへ来る。呼び出し側で明示エラーにする。
+    }
+  }
+
+  /**
+   * 接続先 URL を毎回解決する。固定値を持たないのは、Unity が 8090 を取れず
+   * 8091.. へ逃げている場合に、別プロジェクトの Unity を掴んでしまうため。
+   */
+  async getUnityUrl() {
+    const explicit = process.env.MCP_UNITY_HTTP_URL;
+    if (explicit) {
+      await this.verifyIdentity(explicit);
+      return explicit;
+    }
+    if (!this.projectRoot) {
+      throw new Error(
+        'Unity プロジェクトルートを特定できません（ProjectSettings/ProjectVersion.txt が見つかりません）。' +
+        ' MCP_UNITY_HTTP_URL を明示してください。'
+      );
+    }
+    const ep = this.readEndpoint();
+    if (!ep || !ep.port) {
+      throw new Error(
+        'Unity の MCP サーバーが起動していません。' + NEWLINE +
+        '  期待した受け渡しファイル: ' + this.endpointFilePath() + NEWLINE +
+        '  Unity Editor で ' + this.projectRoot + ' を開いてください。'
+      );
+    }
+    const url = 'http://localhost:' + ep.port;
+    await this.verifyIdentity(url);
+    return url;
+  }
+
+  /**
+   * 接続先がこのプロジェクトの Unity かを毎回確かめる。キャッシュしないのは、
+   * Unity の起動順が変わるとポートの持ち主が入れ替わるため。ローカルホストへの
+   * 往復 1 回なので、取り違えの危険と釣り合わない。
+   */
+  async verifyIdentity(url) {
+    let json;
+    try {
+      const res = await fetch(url + '/mcp/identity');
+      json = await res.json();
+    } catch (e) {
+      throw new Error('Unity の MCP サーバー(' + url + ')へ接続できません: ' + e.message);
+    }
+    // 未知のエンドポイントでも HTTP 200 が返る実装なので、type で判定する
+    if (!json || json.type !== 'identity' || !json.data) {
+      throw new Error(
+        url + ' は Unity MCP の identity を返しませんでした。' +
+        'Unity 側のパッケージが古い可能性があります（identity は v1.5.0 で追加）。'
+      );
+    }
+    const actual = normalizePath(json.data.projectPath || '');
+    if (this.projectRoot && actual.toLowerCase() !== this.projectRoot.toLowerCase()) {
+      throw new Error(
+        '接続先の Unity が別プロジェクトのため操作を中止しました。' + NEWLINE +
+        '  期待: ' + this.projectRoot + NEWLINE +
+        '  実際: ' + actual + '  (' + url + ')' + NEWLINE +
+        '  目的のプロジェクトの Unity Editor が起動しているか確認してください。'
+      );
+    }
   }
 
   setupHandlers() {
@@ -875,7 +983,8 @@ class ClaudeCodeMCPUnityServer {
 
       if (uri === 'unity://scenes_hierarchy') {
         try {
-          const response = await fetch(`${this.unityUrl}/mcp/resources/scenes_hierarchy`);
+          const base = await this.getUnityUrl();
+          const response = await fetch(`${base}/mcp/resources/scenes_hierarchy`);
           const data = await response.json();
           
           return {
@@ -905,7 +1014,8 @@ class ClaudeCodeMCPUnityServer {
         
         console.error(`[MCP Unity] Calling tool: ${name} with args:`, JSON.stringify(args));
         
-        const response = await fetch(`${this.unityUrl}${endpoint}`, {
+        const base = await this.getUnityUrl();
+        const response = await fetch(`${base}${endpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -946,7 +1056,7 @@ class ClaudeCodeMCPUnityServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('[MCP Unity] Server started, Unity URL:', this.unityUrl);
+    console.error('[MCP Unity] Server started. Unity project root:', this.projectRoot || '(unresolved)');
   }
 }
 

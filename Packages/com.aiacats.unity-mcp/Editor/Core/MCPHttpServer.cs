@@ -25,6 +25,9 @@ namespace ClaudeCodeMCP.Editor.Core
         private bool _isRunning;
         private int _port = 8090;
 
+        /// <summary>実際にバインドできたポート。8090 が埋まっていれば 8091.. になる。</summary>
+        public int Port { get { return _port; } }
+
         // Main thread execution
         private readonly Queue<Action> _mainThreadQueue = new Queue<Action>();
         private readonly object _queueLock = new object();
@@ -205,6 +208,7 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/invoke_method"] = new InvokeMethodHandler(this);
             _handlers["/mcp/tools/create_asset"] = new CreateAssetHandler(this);
             _handlers["/mcp/tools/set_object_properties"] = new SetObjectPropertiesHandler(this);
+            _handlers["/mcp/identity"] = new IdentityHandler(this);
         }
 
         #region Server Lifecycle
@@ -238,6 +242,7 @@ namespace ClaudeCodeMCP.Editor.Core
                 _startFailureReported = false;
 
                 Debug.Log($"[Claude Code MCP] HTTP Server started on port {_port}");
+                MCPEndpointFile.Write(_port);
 
                 _requestHandlerThread = new Thread(HandleRequests)
                 {
@@ -277,6 +282,7 @@ namespace ClaudeCodeMCP.Editor.Core
                     _startFailureReported = false;
 
                     Debug.Log($"[Claude Code MCP] HTTP Server started on alternative port {port}");
+                    MCPEndpointFile.Write(port);
 
                     _requestHandlerThread = new Thread(HandleRequests)
                     {
@@ -339,6 +345,7 @@ namespace ClaudeCodeMCP.Editor.Core
                 }
                 _requestHandlerThread = null;
 
+                MCPEndpointFile.Delete();
                 Debug.Log("[Claude Code MCP] Server stopped cleanly");
             }
             catch (Exception ex)

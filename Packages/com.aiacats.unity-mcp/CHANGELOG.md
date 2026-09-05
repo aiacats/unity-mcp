@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-06
+
+### Added
+- **`/mcp/identity` エンドポイント**。接続先の Unity がどのプロジェクトかを返す。
+- **`Library/ClaudeCodeMCP/endpoint.json`**。実際にバインドできたポートとプロジェクトの素性を書き出す。
+  `Library/` は Unity 管理下かつ git 管理外なので、プロジェクトの成果物を汚さない。
+  サーバー停止時に削除するので、古いポートへ繋がせない。
+
+### Fixed
+- **複数の Unity プロジェクトを同時に開くと、別プロジェクトの Unity を操作してしまう問題**。
+  Unity 側は 8090 が埋まっていれば 8091.. へ自動で逃げる（`TryStartAlternativePort`）のに対し、
+  Node ブリッジは 8090 固定で繋いでいた。このため 2 つ目以降の Claude Code が
+  1 つ目の Unity を掴み、しかも応答は正常に返るため気づけなかった。
+  （`force_compilation` で別プロジェクトがコンパイルされ、`save_scene` で別プロジェクトの
+  シーンが保存されるなど、被害が分かりにくい形で出る。）
+- Node ブリッジは接続先を固定で持たず、呼び出しのたびに次の順で解決するようにした。
+  1. `MCP_UNITY_HTTP_URL` が明示されていればそれ（既存構成を壊さない）
+  2. 無ければ `index.js` の位置から上方向に Unity プロジェクトルートを探し、`endpoint.json` を読む
+  3. どちらも取れなければ**明示エラー**（8090 への暗黙の接続はしない）
+- 解決した接続先に対して毎回 `/mcp/identity` で照合し、プロジェクトパスが一致しなければ
+  操作を中止する。キャッシュしないのは、Unity の起動順が変わるとポートの持ち主が入れ替わるため。
+
 ## [1.4.0] - 2026-09-06
 
 ### Changed
