@@ -16,7 +16,6 @@ namespace ClaudeCodeMCP.Editor
     [InitializeOnLoad]
     internal static class MCPAutoBootstrap
     {
-        private const string PackageRelativePath = "Packages/com.aiacats.unity-mcp";
         private const string SessionKey = "ClaudeCodeMCP.AutoInstallAttempted";
         private const string PrefsKey = "ClaudeCodeMCP.AutoInstall";
 
@@ -57,8 +56,8 @@ namespace ClaudeCodeMCP.Editor
 
         private static void TryInstall()
         {
-            string serverPath = Path.GetFullPath(Path.Combine(PackageRelativePath, "Server~"));
-            if (!Directory.Exists(serverPath))
+            string serverPath = MCPPackageLocator.ServerRoot;
+            if (string.IsNullOrEmpty(serverPath) || !Directory.Exists(serverPath))
             {
                 return;
             }

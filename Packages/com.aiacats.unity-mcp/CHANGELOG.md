@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-06
+
+### Changed
+- **パッケージルートの解決を自己位置ベースへ変更**（`Editor/MCPPackageLocator.cs` を新設）。
+  これまで `"Packages/com.aiacats.unity-mcp"` を 4 ファイルへ直書きしていたため、パッケージを
+  別の場所へ置くと npm 自動インストール・サーバー起動・DevSetup が黙って失敗していた。
+  解決を 1 箇所へ集約し、次の 2 経路で求める。解決できなければ警告を出す（握り潰さない）。
+  - `PackageInfo.FindForAssembly` … `Packages/` 配下（embedded / registry / file: 参照）
+  - 自分自身の `MonoScript` から `package.json` を持つ親フォルダまで遡る … `Assets/` 配下へ置いた構成
+- これにより **`Assets/` 配下へ丸ごと置いても動作する**ようになった。
+  `Packages/manifest.json` と `Packages/packages-lock.json` を一切変更せずに導入したい場合に使う。
+  Unity は `Packages/` 配下のパッケージを manifest 記載なしでも認識するが、
+  `packages-lock.json` には `source: "embedded"` のエントリを自動生成してしまうため。
+- 既存の `Packages/` 配下での利用に変更はない（経路 1 で従来どおり解決される）。
+
 ## [1.3.0] - 2026-06-03
 
 ### Added

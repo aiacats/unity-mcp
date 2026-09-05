@@ -154,7 +154,11 @@ namespace ClaudeCodeMCP.Editor
             EditorGUILayout.Space(5);
             
             EditorGUILayout.LabelField("Node.js MCP Server:");
-            string serverPath = System.IO.Path.GetFullPath("Packages/com.aiacats.unity-mcp/Server~/index.js");
+            string serverPath = MCPPackageLocator.ServerEntryPoint;
+            if (string.IsNullOrEmpty(serverPath))
+            {
+                serverPath = "(パッケージルートを解決できませんでした)";
+            }
             EditorGUILayout.SelectableLabel(serverPath, EditorStyles.textField, GUILayout.Height(18));
             
             EditorGUILayout.Space(5);

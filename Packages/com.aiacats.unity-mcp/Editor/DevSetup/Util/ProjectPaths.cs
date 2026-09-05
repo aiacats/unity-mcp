@@ -9,14 +9,18 @@ namespace ClaudeCodeMCP.Editor.DevSetup.Util
     /// </summary>
     internal static class ProjectPaths
     {
+        /// <summary>
+        /// パッケージルートの絶対パス。置き場所（Packages/ か Assets/ か）に依らず
+        /// <see cref="MCPPackageLocator"/> が自己位置から解決する。解決できなければ null。
+        /// </summary>
         public static string PackageRoot
         {
-            get { return Path.GetFullPath("Packages/com.aiacats.unity-mcp"); }
+            get { return MCPPackageLocator.PackageRoot; }
         }
 
         public static string PackageTemplatesRoot
         {
-            get { return Path.Combine(PackageRoot, "Templates~"); }
+            get { return MCPPackageLocator.TemplatesRoot; }
         }
 
         public static string UnityProjectRoot

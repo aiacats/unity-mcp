@@ -79,7 +79,12 @@ namespace ClaudeCodeMCP.Editor
         {
             UnityEngine.Debug.Log("[Claude Code MCP] Installing dependencies via Node.js...");
             
-            string serverPath = System.IO.Path.GetFullPath("Packages/com.aiacats.unity-mcp/Server~");
+            string serverPath = MCPPackageLocator.ServerRoot;
+            if (string.IsNullOrEmpty(serverPath))
+            {
+                UnityEngine.Debug.LogError("[Claude Code MCP] Server~ の場所を解決できないため、インストールを中止します。");
+                return;
+            }
             
 #if UNITY_EDITOR_WIN
             // Try different Node.js paths
@@ -202,8 +207,10 @@ namespace ClaudeCodeMCP.Editor
                     UnityEngine.Debug.Log($"[Claude Code MCP] ✓ Unity HTTP Server: {serverStatus}");
                     
                     // Test if dependencies are installed
-                    string nodeModules = System.IO.Path.Combine(
-                        System.IO.Path.GetFullPath("Packages/com.aiacats.unity-mcp/Server~"), "node_modules");
+                    string serverRoot = MCPPackageLocator.ServerRoot;
+                    string nodeModules = string.IsNullOrEmpty(serverRoot)
+                        ? null
+                        : System.IO.Path.Combine(serverRoot, "node_modules");
                     
                     if (Directory.Exists(nodeModules))
                     {
