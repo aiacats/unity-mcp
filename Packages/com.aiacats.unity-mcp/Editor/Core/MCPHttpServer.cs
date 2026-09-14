@@ -79,8 +79,19 @@ namespace ClaudeCodeMCP.Editor.Core
             if (!_delayCallScheduled)
             {
                 _delayCallScheduled = true;
-                EditorApplication.delayCall += InitializeServerDelayed;
+                ScheduleOnEditorTick(InitializeServerDelayed);
             }
+        }
+
+        /// <summary>
+        /// delayCall はエディタの更新ティックでしか実行されず、背面で待機中の Editor にはティックが来ない。
+        /// そのままだとドメインリロード後のサーバー起動が Editor を前面にするまで止まるため、
+        /// 積んだ直後にプレイヤーループ更新を要求して Editor を起こす（ExecuteOnMainThread と同じ手当て）。
+        /// </summary>
+        private static void ScheduleOnEditorTick(EditorApplication.CallbackFunction callback)
+        {
+            EditorApplication.delayCall += callback;
+            EditorApplication.QueuePlayerLoopUpdate();
         }
 
         private static void InitializeServerDelayed()
@@ -89,8 +100,8 @@ namespace ClaudeCodeMCP.Editor.Core
 
             if (_isDomainReloading || EditorApplication.isCompiling)
             {
-                EditorApplication.delayCall += InitializeServerDelayed;
                 _delayCallScheduled = true;
+                ScheduleOnEditorTick(InitializeServerDelayed);
                 return;
             }
 
@@ -132,14 +143,14 @@ namespace ClaudeCodeMCP.Editor.Core
 
             if (!_isDomainReloading && !EditorApplication.isCompiling)
             {
-                EditorApplication.delayCall += () => {
+                ScheduleOnEditorTick(() => {
                     if (_isDomainReloading || EditorApplication.isCompiling) return;
                     try { StartServer(); }
                     catch (Exception ex)
                     {
                         Debug.LogWarning($"[Claude Code MCP] Auto-start failed: {ex.Message}. You can start manually from Tools menu.");
                     }
-                };
+                });
             }
         }
 
@@ -639,7 +650,7 @@ namespace ClaudeCodeMCP.Editor.Core
             if (state == PlayModeStateChange.ExitingPlayMode || state == PlayModeStateChange.EnteredEditMode)
             {
                 Debug.Log($"[Claude Code MCP] Play mode changed: {state}, ensuring server stability");
-                EditorApplication.delayCall += () => {
+                ScheduleOnEditorTick(() => {
                     if (_isDomainReloading || EditorApplication.isCompiling) return;
 
                     if (!_isRunning || (_httpListener != null && !_httpListener.IsListening))
@@ -648,7 +659,7 @@ namespace ClaudeCodeMCP.Editor.Core
                         try { StopServer(); StartServer(); }
                         catch (Exception ex) { Debug.LogWarning($"[Claude Code MCP] Play mode restart failed: {ex.Message}"); }
                     }
-                };
+                });
             }
         }
 
