@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-14
+
+### Fixed
+- **Unity Editor が背面にある間にドメインリロードすると、Editor を前面にするまで MCP サーバーが起動しない問題**。
+  起動・再起動を `EditorApplication.delayCall` に積んでいたが、delayCall はエディタの更新ティックでしか実行されず、
+  背面で待機中の Editor にはティックが来ない。Claude Code 側からリフレッシュ（再コンパイル）させた直後に
+  「Unity の MCP サーバーが起動していません」となり、Unity をクリックするまで復帰しなかった。
+- 起動・再起動の delayCall を積む箇所で `EditorApplication.QueuePlayerLoopUpdate()` を呼んで Editor を起こすようにした
+  （リクエスト処理の `ExecuteOnMainThread` が既に行っている手当てと同じ）。
+  実測: 背面のまま再コンパイル → 修正前は 3 分以上未起動、修正後は約 15 秒で応答。
+- `Editor/Core/Handlers/ExportPackageHandler.cs.meta` がリポジトリに無く、取り込み先ごとに Unity が別 GUID で生成していた。
+
 ## [1.5.0] - 2026-09-06
 
 ### Added
