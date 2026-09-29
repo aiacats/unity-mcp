@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-09-29
+
+### Fixed
+- **Play 中に Editor がメモリを使い切って落ちる問題**。SceneView 左上の「MCP: ON」表示が、描画のたびに背景用の `Texture2D` を作って破棄していなかった。
+  Play 中は SceneView が毎フレーム描き直されるため、約 1 時間でテクスチャ ID の上限（1048575）を超え、
+  `Resource ID out of range` / `d3d11: failed to create 2D texture` を 8,600 万行吐いたうえで 40GB 確保して OOM でクラッシュした（実測 2026-09-29 RemoteLipSync）。
+  背景のテクスチャとスタイルを 1 つだけ作って使い回すようにした。`SceneView.duringSceneGui` の多重登録も防ぐ。
+
 ## [1.5.2] - 2026-09-29
 
 ### Fixed

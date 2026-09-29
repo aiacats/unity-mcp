@@ -11,6 +11,12 @@ namespace ClaudeCodeMCP.Editor
     public static class ClaudeCodeMCPStatusBar
     {
         private static GUIStyle statusStyle;
+        // 背景の箱。描画のたびに作ると、SceneView が毎フレーム描き直される Play 中にテクスチャが積み上がり、
+        // テクスチャ ID の上限（1048575）を超えて Editor がメモリを使い切って落ちる（実測 2026-09-29 RemoteLipSync: 40GB で OOM）。
+        // 1 つだけ作って使い回す。シーンの切り替えで Unload されないよう HideAndDontSave にする
+        // （ドメインリロードで参照を失った分は残るが、リロード 1 回につき 2x2 の 1 枚だけ）
+        private static GUIStyle boxStyle;
+        private static Texture2D boxTexture;
         private static double lastUpdateTime;
         private const double UPDATE_INTERVAL = 1.0; // Update every second
 
@@ -39,12 +45,14 @@ namespace ClaudeCodeMCP.Editor
         {
             // Reinitialize status style after script reload
             statusStyle = null;
+            boxStyle = null;
         }
 
         // Display status in Scene view
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void InitializeSceneGUI()
         {
+            SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
@@ -71,8 +79,12 @@ namespace ClaudeCodeMCP.Editor
             Color statusColor = isRunning ? Color.green : Color.red;
 
             // Background box style
-            GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
-            boxStyle.normal.background = MakeColorTexture(2, 2, new Color(0, 0, 0, 0.7f));
+            if (boxStyle == null || boxTexture == null)
+            {
+                if (boxTexture == null) boxTexture = MakeColorTexture(2, 2, new Color(0, 0, 0, 0.7f));
+                boxStyle = new GUIStyle(GUI.skin.box);
+                boxStyle.normal.background = boxTexture;
+            }
 
             // Display in top-right of Scene view
             if (SceneView.lastActiveSceneView == null) return;
@@ -102,6 +114,7 @@ namespace ClaudeCodeMCP.Editor
             }
 
             Texture2D texture = new Texture2D(width, height);
+            texture.hideFlags = HideFlags.HideAndDontSave;
             texture.SetPixels(pixels);
             texture.Apply();
             return texture;
