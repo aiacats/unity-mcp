@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-29
+
+### Fixed
+- **`execute_menu_item` が実在するメニューでも「Menu item not found」で実行を拒否する問題**。
+  実行前の存在確認に `Menu.GetEnabled` を使っていたが、メニューの検証がまだ回っていない状態では
+  組み込みの `Window/General/Console` を含む全メニューで false を返していた（Play 前後・ドメインリロード後に発生）。
+  事前チェックをやめ、`EditorApplication.ExecuteMenuItem` の戻り値で判定するようにした。
+  `Menu.GetEnabled` の値はレスポンスの `menuEnabled` に参考値として残す。
+  実測 2026-09-29 RemoteLipSync: 修正前は全メニュー not found、修正後は実在メニューが実行され、存在しないメニューは従来どおりエラー。
+
 ## [1.5.1] - 2026-09-14
 
 ### Fixed

@@ -20,14 +20,20 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 if (string.IsNullOrEmpty(menuPath))
                     return CreateErrorResponse("missing_menu_path", "Menu path is required");
 
-                bool menuExists = Menu.GetEnabled(menuPath);
-                if (!menuExists)
-                    return CreateErrorResponse("menu_item_not_found", $"Menu item not found: {menuPath}");
+                // Menu.GetEnabled は存在確認に使えない。メニューの検証（validate）がまだ回っていないと、
+                // 実在する組み込みメニュー（Window/General/Console 等）でも false を返し、実行前に弾いてしまう
+                // （実測 2026-09-29 RemoteLipSync: ドメインリロード後に全メニューが not found）。
+                // 実行してみて ExecuteMenuItem の戻り値で判定し、GetEnabled は参考値として返すだけにする。
+                bool menuEnabled = Menu.GetEnabled(menuPath);
 
                 var startTime = DateTime.Now;
                 bool wasCompiling = EditorApplication.isCompiling;
                 bool result = EditorApplication.ExecuteMenuItem(menuPath);
                 var executionTime = (DateTime.Now - startTime).TotalMilliseconds;
+
+                if (!result)
+                    return CreateErrorResponse("menu_item_not_found",
+                        $"Menu item not found or failed to execute: {menuPath} (Menu.GetEnabled={menuEnabled})");
 
                 var data = new JObject
                 {
@@ -35,12 +41,11 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                     ["executionTime"] = executionTime,
                     ["compilingChanged"] = EditorApplication.isCompiling != wasCompiling,
                     ["executionResult"] = result,
-                    ["menuExists"] = menuExists
+                    ["menuExists"] = true,
+                    ["menuEnabled"] = menuEnabled
                 };
 
-                return result
-                    ? CreateSuccessResponse("menu_item_executed", data)
-                    : CreateErrorResponse("menu_execution_failed", $"Menu execution returned false: {menuPath}");
+                return CreateSuccessResponse("menu_item_executed", data);
             });
         }
     }
