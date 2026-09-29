@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-09-29
+
+### Changed
+- **`get_console_logs` は Unity の Console ウィンドウの中身（`UnityEditor.LogEntries`）を読むようにした**。
+  以前は MCP 独自に `Application.logMessageReceived` を 100 件ためていたため、次の問題があった。
+  - ドメインリロード（Play 投入・再コンパイル）で消え、サーバーが立ち上がるまでのログ（Play 直後の Awake / Start の例外など）が入らなかった。
+    実測 2026-09-29 RemoteLipSync: Start で出た `PlatformNotSupportedException` が取れず、原因の特定が 1 往復遅れた。
+  - 古い方から返していたので、新しいログが見えなかった。
+  - `clear_console` で消えなかった。
+- 返す順序: 新しい方から `offset` 件を飛ばし、`limit` 件を古い順に並べる（最後が最新）。
+  レスポンスの `data` は `{ logs: [...], returned, order }` になり、各ログに `index`（Console の行番号）を付けた。`timestamp` は Console に無いのでなくした。
+- 読む間だけ Console の Collapse・種類の表示切り替え・検索文字列を外して、読み終えたら元に戻す（表示で絞っていても全部読む）。
+- `LogEntries` は internal API なので、見つからなければ `console_unavailable` と見つからなかった名前を返す（独自バッファへは逃げない）。
+- 不正な `logType` は `invalid_log_type` を返す。
+
 ## [1.5.3] - 2026-09-29
 
 ### Fixed

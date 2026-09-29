@@ -47,7 +47,6 @@ namespace ClaudeCodeMCP.Editor.Core
 
         // Shared state objects
         internal readonly CompilationState CompilationState = new CompilationState();
-        internal readonly ConsoleLogState ConsoleLogState = new ConsoleLogState();
         internal readonly TestRunState TestRunState = new TestRunState();
         internal readonly BuildState BuildState = new BuildState();
         internal readonly ExportState ExportState = new ExportState();
@@ -138,7 +137,6 @@ namespace ClaudeCodeMCP.Editor.Core
             EditorApplication.quitting += OnEditorQuitting;
             CompilationPipeline.assemblyCompilationFinished += OnAfterAssemblyReload;
             EditorApplication.update += ProcessMainThreadQueue;
-            Application.logMessageReceived += ConsoleLogState.OnLogMessageReceived;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
             if (!_isDomainReloading && !EditorApplication.isCompiling)
@@ -169,7 +167,7 @@ namespace ClaudeCodeMCP.Editor.Core
 
             // Console
             _handlers["/mcp/tools/send_console_log"] = new SendConsoleLogHandler(this);
-            _handlers["/mcp/tools/get_console_logs"] = new GetConsoleLogsHandler(this, ConsoleLogState);
+            _handlers["/mcp/tools/get_console_logs"] = new GetConsoleLogsHandler(this);
 
             // Compilation
             _handlers["/mcp/tools/hot_reload"] = new HotReloadHandler(this);
@@ -672,7 +670,6 @@ namespace ClaudeCodeMCP.Editor.Core
         public void Dispose()
         {
             StopServerAndWait();
-            Application.logMessageReceived -= ConsoleLogState.OnLogMessageReceived;
             EditorApplication.quitting -= OnEditorQuitting;
             CompilationPipeline.assemblyCompilationFinished -= OnAfterAssemblyReload;
             EditorApplication.update -= ProcessMainThreadQueue;

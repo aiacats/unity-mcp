@@ -266,7 +266,7 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'get_console_logs',
-            description: 'Retrieves logs from the Unity console with pagination support to avoid token limits',
+            description: 'Retrieves logs from the Unity Console window itself (survives domain reloads, matches what the Console shows, cleared by clear_console). Returns the newest logs: skips `offset` entries counting back from the newest, then returns up to `limit` entries in chronological order (the last item is the newest). Collapse / type filters / search text of the Console window are ignored while reading.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -284,7 +284,7 @@ class ClaudeCodeMCPUnityServer {
                 offset: {
                   type: 'integer',
                   minimum: 0,
-                  description: 'Starting index for pagination (0-based, defaults to 0)'
+                  description: 'Number of newest entries to skip, for paging back to older logs (defaults to 0 = start from the newest)'
                 },
                 includeStackTrace: {
                   type: 'boolean',
