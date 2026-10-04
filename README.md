@@ -119,6 +119,7 @@ Once installed, Claude Code can control Unity using natural language:
 
 - **select_gameobject**: Select objects in hierarchy
 - **get_gameobject_info**: Get detailed GameObject info (Transform, components, hierarchy)
+- **dump_scene_hierarchy**: Dump a scene's structure (hierarchy, components, camera outputs, light rendering layers, missing scripts); opens unloaded scenes additively and closes them
 - **update_gameobject**: Modify GameObject properties (or create new)
 - **delete_gameobject**: Delete a GameObject from the scene
 - **update_component**: Add/modify components

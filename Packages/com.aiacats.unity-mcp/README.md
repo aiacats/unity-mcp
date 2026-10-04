@@ -48,6 +48,7 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 |---------|------|--------------|
 | `select_gameobject` | Hierarchy 上のオブジェクトを選択 | `objectPath` or `instanceId` |
 | `get_gameobject_info` | Transform・コンポーネント・階層情報を取得 | `objectPath` or `instanceId` |
+| `dump_scene_hierarchy` | シーンの構成（階層・部品・カメラの出力先・ライトの Rendering Layer・Missing Script）を書き出す | `scenePath`, `maxDepth`, `componentFilter`, `outputPath` |
 | `update_gameobject` | プロパティ変更（存在しない場合は新規作成） | `objectPath`, `gameObjectData{name, activeSelf, tag, layer, isStatic}` |
 | `delete_gameobject` | シーンから削除（Undo 対応） | `objectPath` or `instanceId` |
 
