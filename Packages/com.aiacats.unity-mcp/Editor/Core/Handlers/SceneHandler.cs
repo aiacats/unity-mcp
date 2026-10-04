@@ -83,6 +83,226 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
         }
     }
 
+    /// <summary>
+    /// シーンの構成（ヒエラルキー・部品・カメラの出力先・ライト・Missing Script）を書き出す。
+    /// 実装や検証でオブジェクトのオン・オフや一時処理を掛ける前に、構成を把握してプロジェクトの CLAUDE.md へ残すためのもの。
+    /// 開いていないシーンは Additive で開いて読み、保存せずに閉じる（開いていたシーンは閉じない）。
+    /// </summary>
+    internal class DumpSceneHierarchyHandler : HandlerBase
+    {
+        public DumpSceneHierarchyHandler(MCPHttpServer server) : base(server) { }
+
+        // 役割が読み取れない基本部品は既定で省く（Transform は全オブジェクトにある。描画の部品は数が多く埋もれる）
+        private static readonly string[] DefaultExcludedComponents =
+        {
+            "Transform", "RectTransform", "MeshFilter", "MeshRenderer", "SkinnedMeshRenderer", "CanvasRenderer"
+        };
+
+        private class Options
+        {
+            public int MaxDepth;
+            public bool IncludeInactive;
+            public string[] Filter;
+            public int MaxNodes;
+            public int NodeCount;
+            public bool Truncated;
+        }
+
+        public override string Handle(string requestBody)
+        {
+            // 開いていないシーンを Additive で読むと数秒かかるので、既定の 5 秒より長く待つ
+            // （大きいシーンで 10 秒程度を実測の目安とし、余裕を見て 60 秒で打ち切る）
+            return ExecuteOnMainThread(() => {
+                var request = string.IsNullOrEmpty(requestBody) ? new JObject() : JObject.Parse(requestBody);
+                string scenePath = request["scenePath"]?.ToString();
+                string outputPath = request["outputPath"]?.ToString();
+                var options = new Options
+                {
+                    MaxDepth = request["maxDepth"]?.ToObject<int>() ?? 2,
+                    IncludeInactive = request["includeInactive"]?.ToObject<bool>() ?? true,
+                    Filter = request["componentFilter"]?.ToObject<string[]>(),
+                    // 応答が大きくなりすぎないよう上限を置く（1 ノード 100〜200 文字なので 2000 で 300KB 前後）
+                    MaxNodes = request["maxNodes"]?.ToObject<int>() ?? 2000,
+                };
+
+                var scenes = new System.Collections.Generic.List<UnityEngine.SceneManagement.Scene>();
+                UnityEngine.SceneManagement.Scene openedHere = default;
+                if (string.IsNullOrEmpty(scenePath))
+                {
+                    for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+                        scenes.Add(UnityEngine.SceneManagement.SceneManager.GetSceneAt(i));
+                }
+                else
+                {
+                    var loaded = UnityEngine.SceneManagement.SceneManager.GetSceneByPath(scenePath);
+                    if (loaded.IsValid() && loaded.isLoaded)
+                    {
+                        scenes.Add(loaded);
+                    }
+                    else
+                    {
+                        if (EditorApplication.isPlaying)
+                            return CreateErrorResponse("play_mode", "Cannot open another scene while in Play Mode. Exit Play Mode or omit scenePath.");
+                        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+                            return CreateErrorResponse("scene_not_found", $"Scene not found: {scenePath}");
+                        openedHere = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                            scenePath, UnityEditor.SceneManagement.OpenSceneMode.Additive);
+                        scenes.Add(openedHere);
+                    }
+                }
+
+                var text = new System.Text.StringBuilder();
+                var sceneArray = new JArray();
+                try
+                {
+                    foreach (var scene in scenes)
+                    {
+                        text.AppendLine($"# {(string.IsNullOrEmpty(scene.path) ? scene.name : scene.path)}");
+                        var roots = new JArray();
+                        foreach (var root in scene.GetRootGameObjects())
+                        {
+                            var node = Walk(root.transform, 0, options, text);
+                            if (node != null) roots.Add(node);
+                        }
+                        sceneArray.Add(new JObject { ["scene"] = scene.path, ["roots"] = roots });
+                    }
+                }
+                finally
+                {
+                    if (openedHere.IsValid())
+                        UnityEditor.SceneManagement.EditorSceneManager.CloseScene(openedHere, true);
+                }
+
+                if (options.Truncated)
+                    text.AppendLine($"(truncated at {options.MaxNodes} nodes; raise maxNodes or lower maxDepth)");
+
+                if (!string.IsNullOrEmpty(outputPath))
+                {
+                    string dir = System.IO.Path.GetDirectoryName(outputPath);
+                    if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+                    System.IO.File.WriteAllText(outputPath, text.ToString(), new System.Text.UTF8Encoding(false));
+                }
+
+                return CreateSuccessResponse("scene_hierarchy_dump", new JObject
+                {
+                    ["scenes"] = sceneArray,
+                    ["text"] = text.ToString(),
+                    ["nodeCount"] = options.NodeCount,
+                    ["truncated"] = options.Truncated,
+                    ["outputPath"] = outputPath
+                });
+            }, 60000);
+        }
+
+        private static JObject Walk(Transform t, int depth, Options options, System.Text.StringBuilder text)
+        {
+            if (!options.IncludeInactive && !t.gameObject.activeInHierarchy) return null;
+            if (options.NodeCount >= options.MaxNodes)
+            {
+                options.Truncated = true;
+                return null;
+            }
+            options.NodeCount++;
+
+            var all = t.GetComponents<Component>();
+            int missing = all.Count(c => c == null);
+            var names = all.Where(c => c != null).Select(c => c.GetType().Name).Distinct()
+                .Where(n => options.Filter != null && options.Filter.Length > 0
+                    ? options.Filter.Contains(n)
+                    : !DefaultExcludedComponents.Contains(n))
+                .ToArray();
+
+            var node = new JObject
+            {
+                ["name"] = t.name,
+                ["active"] = t.gameObject.activeSelf,
+                ["components"] = new JArray(names)
+            };
+            var extra = new System.Text.StringBuilder();
+            if (missing > 0)
+            {
+                node["missingScripts"] = missing;
+                extra.Append($" missing={missing}");
+            }
+            if (PrefabUtility.IsAnyPrefabInstanceRoot(t.gameObject))
+            {
+                node["prefabInstance"] = true;
+                extra.Append(" prefab");
+            }
+            if (t.TryGetComponent<Camera>(out var cam))
+            {
+                node["camera"] = new JObject
+                {
+                    ["display"] = cam.targetDisplay + 1,
+                    ["targetTexture"] = cam.targetTexture != null ? cam.targetTexture.name : null
+                };
+                extra.Append($" display={cam.targetDisplay + 1}");
+                if (cam.targetTexture != null) extra.Append($" rt={cam.targetTexture.name}");
+            }
+            if (t.TryGetComponent<Light>(out var light))
+            {
+                var lightJson = new JObject { ["type"] = light.type.ToString() };
+                extra.Append($" light={light.type}");
+                uint? layers = GetUrpRenderingLayers(light);
+                if (layers.HasValue)
+                {
+                    lightJson["renderingLayers"] = layers.Value;
+                    extra.Append($" renderingLayers=0x{layers.Value:X}");
+                }
+                node["light"] = lightJson;
+            }
+
+            int childCount = t.childCount;
+            text.Append(new string(' ', depth * 2)).Append("- ").Append(t.name)
+                .Append(t.gameObject.activeSelf ? "" : " (inactive)")
+                .Append(names.Length > 0 ? " [" + string.Join(",", names) + "]" : "")
+                .Append(extra)
+                .Append(childCount > 0 && depth >= options.MaxDepth ? $" (+{childCount} children)" : "")
+                .AppendLine();
+
+            if (childCount > 0)
+            {
+                if (depth >= options.MaxDepth)
+                {
+                    node["childCount"] = childCount;
+                }
+                else
+                {
+                    var children = new JArray();
+                    foreach (Transform c in t)
+                    {
+                        var child = Walk(c, depth + 1, options, text);
+                        if (child != null) children.Add(child);
+                    }
+                    node["children"] = children;
+                }
+            }
+            return node;
+        }
+
+        /// <summary>
+        /// URP の UniversalAdditionalLightData.renderingLayers をリフレクションで読む。
+        /// URP は Light.renderingLayerMask ではなくこちらでライトの当たる対象を決める。
+        /// URP を使っていないプロジェクトでもコンパイルできるよう型を直接参照しない。
+        /// </summary>
+        private static uint? GetUrpRenderingLayers(Light light)
+        {
+            foreach (var comp in light.GetComponents<Component>())
+            {
+                if (comp == null || comp.GetType().Name != "UniversalAdditionalLightData") continue;
+                var prop = comp.GetType().GetProperty("renderingLayers");
+                if (prop == null) return null;
+                object value = prop.GetValue(comp);
+                if (value is uint u) return u;
+                // URP のバージョンによっては RenderingLayerMask 構造体で返る（value プロパティに uint を持つ）
+                var valueProp = value?.GetType().GetProperty("value");
+                if (valueProp != null) return Convert.ToUInt32(valueProp.GetValue(value));
+                return null;
+            }
+            return null;
+        }
+    }
+
     internal class GetScenesHierarchyHandler : HandlerBase
     {
         public GetScenesHierarchyHandler(MCPHttpServer server) : base(server) { }

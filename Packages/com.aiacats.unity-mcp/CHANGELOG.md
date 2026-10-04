@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-10-04
+
+### Added
+- **`dump_scene_hierarchy`**: シーンの構成を書き出すツール。実装や検証でオブジェクトのオン・オフや一時処理を掛ける前に、
+  構成を把握してプロジェクトの CLAUDE.md へ残すためのもの（ユーザー指示 2026-10-04）。
+  - ヒエラルキー（`maxDepth` まで。より深い所は `+N children`）、アクティブ状態、部品名（既定で Transform・MeshFilter・Renderer などは省く。`componentFilter` で絞れる）、
+    カメラの出力先（Display・RenderTexture）、ライトの種類と URP の Rendering Layer、Missing Script の数、Prefab インスタンスの根を返す。
+  - URP の Rendering Layer は `UniversalAdditionalLightData.renderingLayers` をリフレクションで読む（URP は `Light.renderingLayerMask` ではなくこちらを使う。URP を使わないプロジェクトでもコンパイルできるよう型を参照しない）。
+  - `scenePath` を省くと開いているシーンすべて。開いていないシーンは Additive で開いて読み、保存せずに閉じる（Play 中は拒否）。
+  - JSON に加えて字下げしたテキストも返し、`outputPath` を渡すとテキストをファイルにも書く。応答が大きくなりすぎないよう `maxNodes`（既定 2000）で打ち切る。
+  - 実測 2026-10-04 SinkaiFes2026: 開いている test_Azuki（maxDepth 1）で 47 ノード、閉じている test_Plate（maxDepth 2）を開いて 115 ノード読み、読んだ後に test_Plate が閉じられていることを確認。
+
 ## [1.5.4] - 2026-09-29
 
 ### Changed

@@ -191,6 +191,7 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/save_scene"] = new SaveSceneHandler(this);
             _handlers["/mcp/tools/open_scene"] = new OpenSceneHandler(this);
             _handlers["/mcp/resources/scenes_hierarchy"] = new GetScenesHierarchyHandler(this);
+            _handlers["/mcp/tools/dump_scene_hierarchy"] = new DumpSceneHierarchyHandler(this);
             _handlers["/mcp/tools/find_assets"] = new FindAssetsHandler(this);
             _handlers["/mcp/tools/add_asset_to_scene"] = new AddAssetToSceneHandler(this);
             _handlers["/mcp/tools/create_material"] = new CreateMaterialHandler(this);

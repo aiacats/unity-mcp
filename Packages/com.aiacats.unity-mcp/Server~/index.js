@@ -712,6 +712,40 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
+            name: 'dump_scene_hierarchy',
+            description: 'Dumps a scene\'s structure for planning work: hierarchy paths up to maxDepth, active state, component type names (Transform/MeshFilter/renderers omitted unless listed in componentFilter), camera output (Display / RenderTexture), light type and URP rendering layers, missing-script count, prefab-instance roots. Opens a not-loaded scene additively and closes it without saving (refused in Play Mode). Returns structured JSON plus an indented text outline; optionally writes the text to outputPath.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                scenePath: {
+                  type: 'string',
+                  description: 'Scene asset path (e.g. "Assets/Scenes/Main.unity"). Omit to dump all open scenes.'
+                },
+                maxDepth: {
+                  type: 'number',
+                  description: 'Hierarchy depth to expand (0 = roots only). Deeper children are summarized as "+N children". Default 2.'
+                },
+                includeInactive: {
+                  type: 'boolean',
+                  description: 'Include inactive GameObjects (shown as "(inactive)"). Default true.'
+                },
+                componentFilter: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Only list these component type names (e.g. ["Animator","Camera"]). Omit to list all except Transform/RectTransform/MeshFilter/MeshRenderer/SkinnedMeshRenderer/CanvasRenderer.'
+                },
+                maxNodes: {
+                  type: 'number',
+                  description: 'Stop after this many GameObjects (response size guard). Default 2000.'
+                },
+                outputPath: {
+                  type: 'string',
+                  description: 'Optional file path to also write the text outline to (UTF-8).'
+                }
+              }
+            }
+          },
+          {
             name: 'get_gameobject_info',
             description: 'Gets detailed information about a GameObject including Transform, components list, hierarchy info, and properties.',
             inputSchema: {
