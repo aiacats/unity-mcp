@@ -33,6 +33,40 @@ function findUnityProjectRoot(start) {
   }
 }
 
+/** capture_views / start_view_recording が共有する引数（Unity 側 ViewHandlerBase.ParseView と同じ名前・既定値） */
+const VIEW_PROPERTIES = {
+  target: {
+    type: 'string',
+    description: 'Hierarchy path of the character (its Animator, or a parent with exactly one Animator below). Its renderers decide the default cullingMask.'
+  },
+  views: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        yaw: { type: 'number', description: 'Degrees around the subject from its front. Positive = camera moves to the subject\'s right.' },
+        pitch: { type: 'number', description: 'Degrees up from horizontal. Positive = looking down from above.' }
+      }
+    },
+    description: 'One camera per entry, laid out left to right in one image. Default [{yaw:0,pitch:0}].'
+  },
+  focusBone: { type: 'string', description: 'HumanBodyBones name the cameras look at (e.g. Head, Chest, RightHand). Default Head.' },
+  focusPath: { type: 'string', description: 'Hierarchy path of any Transform to look at instead of focusBone (needed for non-Humanoid rigs).' },
+  focusOffset: { type: 'array', items: { type: 'number' }, description: '[right, up, forward] meters added to the focus point, in the subject\'s front frame. E.g. [0, 0.05, 0.1] toward the mouth from Head. Default [0,0,0].' },
+  distance: { type: 'number', description: 'Camera distance from the focus point in meters. Default 1.' },
+  fov: { type: 'number', description: 'Vertical field of view in degrees. Default 30.' },
+  width: { type: 'number', description: 'Whole image width in pixels, split evenly among views (must be divisible by the number of views). Default 720 x number of views.' },
+  height: { type: 'number', description: 'Image height in pixels. Default 720.' },
+  front: { type: 'string', enum: ['eyes', 'shoulders', 'hips', 'head', 'root', 'world'], description: 'How the subject\'s front is found. eyes = LeftEye/RightEye (default); shoulders / hips = UpperArm or UpperLeg pair; head = shoulders at the first frame then follows the Head bone rotation; root = Animator transform forward; world = +Z. Never switches silently: errors if the bones are missing. The result reports which one was used.' },
+  followFront: { type: 'boolean', description: 'Recompute the front every frame so the cameras orbit with the subject (default true). false = keep the first frame\'s front.' },
+  cullingMask: { type: 'number', description: 'Camera layer mask. Default = layers of target and all its child renderers (props held in the hand included).' },
+  background: { type: 'array', items: { type: 'number' }, description: 'Background [r,g,b] 0..1. Default [0.25,0.25,0.25].' },
+  light: { type: 'boolean', description: 'Add a directional light from the front-above, enabled only while these cameras render, hitting every rendering layer (URP UniversalAdditionalLightData.renderingLayers). Default true.' },
+  lightIntensity: { type: 'number', description: 'Intensity of that light. Default 1.2.' },
+  disableComponents: { type: 'array', items: { type: 'string' }, description: 'Component type names under target to disable while active (e.g. ["OptitrackSkeletonAnimator"] for a live mocap receiver that overrides the Animator). Restored afterwards. Errors if a name matches nothing.' },
+  hideObjects: { type: 'array', items: { type: 'string' }, description: 'Hierarchy paths to deactivate while active (e.g. another character standing at the same spot). Restored afterwards.' }
+};
+
 /**
  * Claude Code MCP Unity Server
  * Connects to Unity Editor via HTTP REST API
@@ -744,6 +778,85 @@ class ClaudeCodeMCPUnityServer {
                 }
               }
             }
+          },
+          {
+            name: 'play_animation_clip',
+            description: 'Play Mode only. Applies an AnimationClip (a .anim or a clip inside an FBX, Humanoid included) to an Animator through a manual PlayableGraph, evaluated after the Animator\'s own update and before LateUpdate scripts, so runtime corrections still apply on top. Keeps playing (or holding) until stop_animation_clip or exiting Play Mode. Use disableComponents for live receivers that would overwrite the pose.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                target: VIEW_PROPERTIES.target,
+                clipPath: { type: 'string', description: 'Asset path of the .anim / .fbx (e.g. Assets/Motion/take01.fbx).' },
+                clipName: { type: 'string', description: 'Clip name inside clipPath; required when it holds several clips.' },
+                time: { type: 'number', description: 'Clip time in seconds to start from. Default 0.' },
+                speed: { type: 'number', description: 'Playback speed multiplier. Default 1.' },
+                advance: { type: 'boolean', description: 'true = advance with game time (default); false = hold the pose at time.' },
+                disableComponents: VIEW_PROPERTIES.disableComponents,
+                hideObjects: VIEW_PROPERTIES.hideObjects
+              },
+              required: ['target', 'clipPath']
+            }
+          },
+          {
+            name: 'stop_animation_clip',
+            description: 'Removes the clip applied by play_animation_clip and restores the components/objects it disabled or hid. Omit target to stop all. A clip driven by a running view recording is not affected.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                target: { type: 'string', description: 'Hierarchy path used with play_animation_clip. Omit for all.' }
+              }
+            }
+          },
+          {
+            name: 'capture_views',
+            description: 'Renders the character from one or more angles (relative to its face front) into a single PNG, views side by side, with temporary cameras that only see the target\'s layers. In Play Mode the shot is taken on the next frame after skinning (rendering inside LateUpdate would show the previous frame\'s skinned mesh, so hand-held props look detached). Edit Mode and paused Play Mode shoot immediately. Returns the front method used.',
+            inputSchema: {
+              type: 'object',
+              properties: Object.assign({
+                outputPath: { type: 'string', description: 'PNG path to write. Missing directories are created.' }
+              }, VIEW_PROPERTIES),
+              required: ['target', 'outputPath']
+            }
+          },
+          {
+            name: 'start_view_recording',
+            description: 'Play Mode only. Records numbered PNG frames (frame_00000.png ...) at a fixed fps (Time.captureFramerate, so physics and spring bones step at 1/fps regardless of real speed) from one or more angles after skinning, plus recording.json at the end. With clipPath it drives that clip from startTime to endTime itself (a clip applied to the same Animator by play_animation_clip is suspended and restored afterwards, and play/stop_animation_clip cannot touch the clip of the recording); without it, it records the current motion for duration seconds. Returns immediately: follow with wait_for_view_recording_done, then turn frames into mp4 with ffmpeg.',
+            inputSchema: {
+              type: 'object',
+              properties: Object.assign({
+                outputDir: { type: 'string', description: 'Folder for the frames. Refuses a folder that already has frame_*.png unless overwrite=true.' },
+                overwrite: { type: 'boolean', description: 'Delete existing frame_*.png and recording.json in outputDir first. Default false.' },
+                fps: { type: 'number', description: 'Frames per second of game time, integer (Time.captureFramerate). Default 30.' },
+                clipPath: { type: 'string', description: 'Clip to drive during the recording (.anim / .fbx). Omit to record the current motion.' },
+                clipName: { type: 'string', description: 'Clip name inside clipPath when it holds several.' },
+                startTime: { type: 'number', description: 'Clip time (s) of the first frame. Default 0.' },
+                endTime: { type: 'number', description: 'Clip time (s) where recording stops (exclusive). Default clip length.' },
+                speed: { type: 'number', description: 'Clip speed. Default 1.' },
+                duration: { type: 'number', description: 'Seconds to record when clipPath is omitted.' },
+                preroll: { type: 'number', description: 'Seconds simulated before startTime without writing frames, so spring bones settle after jumping into the clip. Default 0.' }
+              }, VIEW_PROPERTIES),
+              required: ['target', 'outputDir']
+            }
+          },
+          {
+            name: 'get_view_recording_status',
+            description: 'Returns the view recording state (recording / finishing / completed / stopped / failed), frames captured and written, output folder, file pattern, front method and timing. Use wait_for_view_recording_done instead of polling.',
+            inputSchema: { type: 'object', properties: {} }
+          },
+          {
+            name: 'wait_for_view_recording_done',
+            description: 'Blocks until the current view recording has captured and written every frame, then returns the status (timedOut=true if still running). Call again to keep waiting.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeoutMs: { type: 'number', description: 'Maximum wait in ms. Default 240000 (stays under the 300 s HTTP response limit of this bridge).' }
+              }
+            }
+          },
+          {
+            name: 'stop_view_recording',
+            description: 'Stops the view recording early. Frames already captured are still written; disabled components, hidden objects, skin settings and captureFramerate are restored.',
+            inputSchema: { type: 'object', properties: {} }
           },
           {
             name: 'get_gameobject_info',

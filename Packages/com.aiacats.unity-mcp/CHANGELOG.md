@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-04
+
+### Added
+- **キャラの見え方を撮るツール群**（どの案件でも使える形に。対になる Claude Code のスキルは `unity-view-recording`）。
+  - `play_animation_clip` / `stop_animation_clip`: Play 中に Animator へクリップ（.anim・FBX 内のクリップ、Humanoid 含む）を手動評価の PlayableGraph で当てる。
+    評価は Animator 自身の評価（`PreLateUpdate.DirectorUpdateAnimationEnd`）の直後で、LateUpdate の補正スクリプトはその上に掛かる。
+    Edit モードの PlayableGraph は Humanoid の骨に書かないので、Play 外は `not_playing` で拒否する。
+  - `capture_views`: 顔の正面を基準にした複数の角度（yaw/pitch）から一時カメラで撮り、横に並べて 1 枚の PNG にする。Play 中は次のフレームのスキニング後に撮る。
+  - `start_view_recording` / `wait_for_view_recording_done` / `get_view_recording_status` / `stop_view_recording`: `Time.captureFramerate` で一定 FPS の連番 PNG と `recording.json` を書く。
+    `clipPath` を渡すとクリップの時刻をフレーム番号から決めて区間 [startTime, endTime) を流す（`preroll` で揺れものを先に落ち着かせられる）。
+  - 撮るのは PlayerLoop の `PostLateUpdate.UpdateAllSkinnedMeshes` の直後（MonoBehaviour を置かないのでシーンに残らず、Game ビューの描画にも依存しない）。
+    撮影中だけ対象の `SkinnedMeshRenderer.updateWhenOffscreen` を true にして戻す。
+  - 撮影用ライトは URP の `UniversalAdditionalLightData.renderingLayers` を全ビットにする（リフレクション。URP の無い案件でもコンパイルできる）。撮る間だけ有効にする。
+  - `disableComponents`（型名で一時無効化。ライブ受信が Animator を上書きするとき）と `hideObjects`（一時非表示）。対象ごとに参照数を数え、最初に借りた時点の状態へ戻す。
+  - 顔の正面は既定で両目から求め、目の骨が無ければ黙って切り替えずにエラーにする（`front`: eyes / shoulders / hips / head / root / world を明示）。結果に使った方法を出す。
+  - PNG 化と書き込みは専用スレッド（バッファ 4 枚を使い回し、毎フレームの部分で GC を出さない）。一時カメラ・ライト・RT は使い回して録画の終わりに遅延破棄する
+    （撮影直後に DestroyImmediate すると Play 終了直後に D3D11 の BeginProfileEvent で落ちたため）。Play 終了・ドメインリロードの前にすべて止めて戻し、PlayerLoop から外す。
+  - 実測 2026-10-04 SinkaiFes2026（Unity 6000.3.5f2 / URP 17）: 収録モーション 1295〜1335 秒を 2 角度 1440x720・30fps で 1200 コマ、32〜37 秒（27 ms/コマ）。
+    手を口元へ上げる速いコマを拡大してマイク（手の子）と手のずれが無いことを確認。途中停止（160 コマ）と録画中の Play 終了（165 コマで aborted）でも書き切って復元した。
+  - 録画が当てているクリップは play / stop_animation_clip から触れない。同じ Animator の play_animation_clip のクリップは録画の間だけ退避して戻す（lease も持ち越す）。
+
+### Known issues
+- 検証中に 1 回、Play 終了直後に Unity が `GfxDeviceWorker` の `ReleaseD3D11Buffer` で落ちた（2026-10-04 SinkaiFes2026、Play を 4 回抜けたうちの 1 回）。
+  同じプロジェクトでは本ツール導入前から Play 終了直後のクラッシュ（`BeginProfileEvent`）が出ており、因果は未確定。
+
 ## [1.5.5] - 2026-10-04
 
 ### Added

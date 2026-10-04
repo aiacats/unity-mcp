@@ -219,6 +219,15 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/create_asset"] = new CreateAssetHandler(this);
             _handlers["/mcp/tools/set_object_properties"] = new SetObjectPropertiesHandler(this);
             _handlers["/mcp/identity"] = new IdentityHandler(this);
+
+            // View recording (apply a clip in Play Mode, capture a character from several angles after skinning)
+            _handlers["/mcp/tools/play_animation_clip"] = new PlayAnimationClipHandler(this);
+            _handlers["/mcp/tools/stop_animation_clip"] = new StopAnimationClipHandler(this);
+            _handlers["/mcp/tools/capture_views"] = new CaptureViewsHandler(this);
+            _handlers["/mcp/tools/start_view_recording"] = new StartViewRecordingHandler(this);
+            _handlers["/mcp/tools/get_view_recording_status"] = new GetViewRecordingStatusHandler(this);
+            _handlers["/mcp/tools/wait_for_view_recording_done"] = new WaitForViewRecordingDoneHandler(this);
+            _handlers["/mcp/tools/stop_view_recording"] = new StopViewRecordingHandler(this);
         }
 
         #region Server Lifecycle
