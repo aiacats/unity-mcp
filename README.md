@@ -138,6 +138,13 @@ Once installed, Claude Code can control Unity using natural language:
 - **execute_menu_item**: Run Unity menu commands
 - **add_package**: Install packages via Package Manager
 
+#### Character View Recording (Play Mode)
+
+- **play_animation_clip** / **stop_animation_clip**: Apply an AnimationClip (FBX clips, Humanoid included) to an Animator; runtime LateUpdate corrections still apply on top
+- **capture_views**: Render the character from several angles relative to its face front into one PNG, after skinning
+- **start_view_recording**: Write numbered PNG frames at a fixed fps (optionally driving a clip range), plus recording.json
+- **wait_for_view_recording_done** / **get_view_recording_status** / **stop_view_recording**: Wait, poll, or stop early
+
 #### Development Workflow
 
 - **hot_reload**: Trigger script recompilation

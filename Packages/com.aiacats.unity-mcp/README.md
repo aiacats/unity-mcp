@@ -74,6 +74,17 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 | `execute_menu_item` | メニューコマンドを実行 | `menuPath` |
 | `add_package` | Package Manager でパッケージ追加 | `source(registry/github/disk)`, `packageName` |
 
+### キャラの見え方を撮る（Play 中）
+
+| ツール名 | 説明 | 主要パラメータ |
+|---------|------|--------------|
+| `play_animation_clip` | Animator へクリップ（FBX 内も）を当てる。LateUpdate の補正はその上に掛かる | `target`, `clipPath`, `clipName`, `time`, `speed`, `advance`, `disableComponents`, `hideObjects` |
+| `stop_animation_clip` | 当てたクリップを外し、無効化・非表示を戻す | `target`（省略で全部） |
+| `capture_views` | 顔の正面基準の複数角度を 1 枚の PNG に（スキニング後に撮る） | `target`, `views[{yaw,pitch}]`, `focusBone`, `focusOffset`, `distance`, `fov`, `width`, `height`, `front`, `outputPath` |
+| `start_view_recording` | 一定 FPS の連番 PNG + recording.json。クリップを区間で流せる | 上と同じ + `outputDir`, `fps`, `clipPath`, `startTime`, `endTime`, `duration`, `preroll` |
+| `wait_for_view_recording_done` | 全コマの書き込みまで待つ | `timeoutMs`（既定 240000） |
+| `get_view_recording_status` / `stop_view_recording` | 進捗 / 途中で止める（撮れたコマは書き切る） | なし |
+
 ### 開発ワークフロー
 
 | ツール名 | 説明 | 主要パラメータ |
