@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-04
+
+### Added
+- `capture_views` が Animator の無い物（セット・小道具）も撮れるようにした。正面は `front` に root / world を明示する（目・肩などは Animator が要るのでエラー）。
+  注視点は `focusPath`、省略時は target 自身。
+- `capture_views` の `fit`: 表示中の Renderer の bounds（AABB）の中心を注視点にし、最初の角度に 8 隅が収まる距離（余白 5%）にする。`hideObjects` で隠した物は含めない。
+  結果に `fitDistance` と `fitFocusOffset` を返す。実測 2026-11-04 Ext_TokinoSora_2026-pia のサイドステージ 3 種（左右 2 基ずつ）。
+  bounds が見た目より大きい物（細い線が遠くまで伸びている等）は寄りが甘く中心もずれるので、返った値を元に `focusOffset` と `distance` を手で詰める。
+
 ## [1.6.0] - 2026-10-04
 
 ### Added

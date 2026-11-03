@@ -43,14 +43,21 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             return go;
         }
 
-        /// <summary>target の Animator。本人に無ければ子に 1 つだけあるものを使う（複数なら選ばせる）</summary>
-        protected static Animator ResolveAnimator(GameObject target)
+        /// <summary>
+        /// target の Animator。本人に無ければ子に 1 つだけあるものを使う（複数なら選ばせる）。
+        /// allowNone なら、Animator の無い物（セット・小道具）は null を返す
+        /// </summary>
+        protected static Animator ResolveAnimator(GameObject target, bool allowNone = false)
         {
             Animator an = target.GetComponent<Animator>();
             if (an != null) return an;
             Animator[] found = target.GetComponentsInChildren<Animator>(true);
             if (found.Length == 1) return found[0];
-            if (found.Length == 0) throw new ArgumentException($"target: no Animator on or under '{target.name}'.");
+            if (found.Length == 0)
+            {
+                if (allowNone) return null;
+                throw new ArgumentException($"target: no Animator on or under '{target.name}'.");
+            }
             var names = new List<string>();
             foreach (Animator a in found) names.Add(TemporaryOverrides.PathOf(a.transform));
             throw new ArgumentException("target: several Animators found; pass one of: " + string.Join(", ", names));
@@ -126,6 +133,12 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 s.Focus = ResolveObject(focusPath, "focusPath").transform;
                 s.FocusName = TemporaryOverrides.PathOf(s.Focus);
             }
+            else if (animator == null)
+            {
+                if (req["focusBone"] != null) throw new ArgumentException($"focusBone needs an Animator; '{target.name}' has none. Pass focusPath or fit.");
+                s.Focus = target.transform;
+                s.FocusName = TemporaryOverrides.PathOf(target.transform);
+            }
             else
             {
                 string boneName = req["focusBone"]?.ToString() ?? "Head";
@@ -185,7 +198,7 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
             for (int i = 0; i < s.Yaw.Length; i++) views.Add(new JObject { ["yaw"] = s.Yaw[i], ["pitch"] = s.Pitch[i] });
             return new JObject
             {
-                ["target"] = TemporaryOverrides.PathOf(s.Animator.transform),
+                ["target"] = TemporaryOverrides.PathOf(s.Animator != null ? s.Animator.transform : s.Target.transform),
                 ["views"] = views,
                 ["focus"] = s.FocusName,
                 ["front"] = rig.FrontDescription,
@@ -296,14 +309,23 @@ namespace ClaudeCodeMCP.Editor.Core.Handlers
                 outputPath = req["outputPath"]?.ToString();
                 if (string.IsNullOrEmpty(outputPath)) throw new ArgumentException("outputPath (.png) is required.");
                 GameObject target = ResolveObject(req["target"]?.ToString(), "target");
-                Animator animator = ResolveAnimator(target);
+                // セット・小道具も撮れるよう、capture_views だけは Animator の無い target を受ける（正面は root / world を明示させる）
+                Animator animator = ResolveAnimator(target, allowNone: true);
                 ViewSettings s = ParseView(req, target, animator);
                 ViewRig rig = ViewRig.Create(s, out string error);
                 if (rig == null) throw new ArgumentException(error);
                 TemporaryOverrides.Lease lease;
                 try { lease = AcquireOverrides(req, target); }
                 catch { rig.Dispose(); throw; }
+                bool fit = req["fit"]?.ToObject<bool>() ?? false;
+                try { if (fit) rig.FitToRenderers(); }
+                catch { TemporaryOverrides.Release(lease); rig.Dispose(); throw; }
                 info = Describe(s, rig, lease);
+                if (fit)
+                {
+                    info["fitDistance"] = s.Distance;
+                    info["fitFocusOffset"] = new JArray(s.FocusOffset.x, s.FocusOffset.y, s.FocusOffset.z);
+                }
                 info["capturedAfterNextFrame"] = ViewCapture.NeedsNextFrame;
                 width = s.Width;
                 height = s.Height;

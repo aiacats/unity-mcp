@@ -58,6 +58,8 @@ namespace ClaudeCodeMCP.Editor.Core.ViewRecording
         private const float FarClip = 100f;
         // 撮影用ライトの下向きの傾き（前方 1 に対して 0.3 ≒ 17°）。2026-10-04 SinkaiFes2026 の検証で顔に影が落ちすぎない向きとして使った値
         private const float LightDownTilt = 0.3f;
+        // fit の余白: 収めた bounds の縁が画面の端に接しないよう、距離を 5% 引く（縁の画素が背景色で見える分）
+        private const float FitMargin = 1.05f;
 
         private readonly ViewSettings _s;
         private GameObject _holder;
@@ -170,7 +172,7 @@ namespace ClaudeCodeMCP.Editor.Core.ViewRecording
                     if (head == null) { error = "front=head needs a Humanoid Head bone."; return null; }
                     break;
                 case FrontMode.Root:
-                    desc = "root (" + an.name + ".forward)";
+                    desc = "root (" + (an != null ? an.name : s.Target.name) + ".forward)";
                     break;
                 default:
                     desc = "world (+Z)";
@@ -179,14 +181,14 @@ namespace ClaudeCodeMCP.Editor.Core.ViewRecording
             if ((s.Front == FrontMode.Eyes || s.Front == FrontMode.Shoulders || s.Front == FrontMode.Hips || s.Front == FrontMode.Head)
                 && (a == null || b == null))
             {
-                error = $"front={s.Front.ToString().ToLowerInvariant()} needs Humanoid bones that '{an.name}' does not have. " +
+                error = $"front={s.Front.ToString().ToLowerInvariant()} needs Humanoid bones that '{(an != null ? an.name : s.Target.name)}' does not have. " +
                         "Choose another front explicitly (eyes / shoulders / hips / head / root / world).";
                 return null;
             }
             return new ViewRig(s, a, b, head, desc);
         }
 
-        private static Transform Bone(Animator an, HumanBodyBones bone) => an.isHuman ? an.GetBoneTransform(bone) : null;
+        private static Transform Bone(Animator an, HumanBodyBones bone) => an != null && an.isHuman ? an.GetBoneTransform(bone) : null;
 
         /// <summary>水平の正面（単位ベクトル）。毎フレーム呼ぶので確保しない</summary>
         public Vector3 ComputeFront()
@@ -195,7 +197,7 @@ namespace ClaudeCodeMCP.Editor.Core.ViewRecording
             Vector3 f;
             switch (_s.Front)
             {
-                case FrontMode.Root: f = _s.Animator.transform.forward; break;
+                case FrontMode.Root: f = (_s.Animator != null ? _s.Animator.transform : _s.Target.transform).forward; break;
                 case FrontMode.World: f = Vector3.forward; break;
                 case FrontMode.Head:
                     if (!_hasFront) _headLocalFront = Quaternion.Inverse(_head.rotation) * Across(_a, _b);
@@ -220,6 +222,46 @@ namespace ClaudeCodeMCP.Editor.Core.ViewRecording
             Vector3 right = Vector3.Cross(Vector3.up, front);
             Vector3 o = _s.FocusOffset;
             return _s.Focus.position + right * o.x + Vector3.up * o.y + front * o.z;
+        }
+
+        /// <summary>
+        /// 対象の表示中の Renderer の bounds（AABB の 8 隅）が最初の角度の画面に収まるよう、注視点（bounds の中心）と距離を決める。
+        /// セット・小道具のように大きさの分からない物を撮るため。2 つ目以降の角度は同じ距離で回り込む（収まるとは限らない）
+        /// </summary>
+        public void FitToRenderers()
+        {
+            bool any = false;
+            Bounds bounds = default;
+            foreach (Renderer r in _s.Target.GetComponentsInChildren<Renderer>(false))
+            {
+                if (!r.enabled) continue;
+                if (!any) { bounds = r.bounds; any = true; }
+                else bounds.Encapsulate(r.bounds);
+            }
+            if (!any) throw new ArgumentException($"fit: no active, enabled Renderer under '{_s.Target.name}'.");
+
+            Vector3 front = ComputeFront();
+            Vector3 right = Vector3.Cross(Vector3.up, front);
+            Vector3 d = bounds.center - _s.Focus.position;
+            _s.FocusOffset = new Vector3(Vector3.Dot(d, right), d.y, Vector3.Dot(d, front));
+
+            // Render と同じ向き: カメラは注視点から dir の側に立ち、注視点を見る
+            Vector3 dir = Quaternion.AngleAxis(_s.Yaw[0], Vector3.up) * (Quaternion.AngleAxis(-_s.Pitch[0], right) * front);
+            Quaternion look = Quaternion.LookRotation(-dir, Vector3.up);
+            Vector3 camRight = look * Vector3.right;
+            Vector3 camUp = look * Vector3.up;
+            float tanV = Mathf.Tan(_s.Fov * 0.5f * Mathf.Deg2Rad);
+            float tanH = tanV * ((float)_s.Width / _s.Yaw.Length) / _s.Height;
+            float need = 0f;
+            Vector3 e = bounds.extents;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 rel = new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                // 隅がカメラ側へ出ている分（toward）だけ近く、その位置の視錐台の半幅に横・縦の張り出しが収まる距離
+                float toward = Vector3.Dot(rel, dir);
+                need = Mathf.Max(need, toward + Mathf.Abs(Vector3.Dot(rel, camRight)) / tanH, toward + Mathf.Abs(Vector3.Dot(rel, camUp)) / tanV);
+            }
+            _s.Distance = need * FitMargin;
         }
 
         /// <summary>全角度を RT へ描く。スキニングの後（ViewRecordingLoop の撮影の時点）に呼ぶ</summary>

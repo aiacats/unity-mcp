@@ -809,11 +809,12 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'capture_views',
-            description: 'Renders the character from one or more angles (relative to its face front) into a single PNG, views side by side, with temporary cameras that only see the target\'s layers. In Play Mode the shot is taken on the next frame after skinning (rendering inside LateUpdate would show the previous frame\'s skinned mesh, so hand-held props look detached). Edit Mode and paused Play Mode shoot immediately. Returns the front method used.',
+            description: 'Renders the character from one or more angles (relative to its face front) into a single PNG, views side by side, with temporary cameras that only see the target\'s layers. In Play Mode the shot is taken on the next frame after skinning (rendering inside LateUpdate would show the previous frame\'s skinned mesh, so hand-held props look detached). Edit Mode and paused Play Mode shoot immediately. Returns the front method used. Also works on objects without an Animator (sets, props): pass front root or world, and fit=true to frame them.',
             inputSchema: {
               type: 'object',
               properties: Object.assign({
-                outputPath: { type: 'string', description: 'PNG path to write. Missing directories are created.' }
+                outputPath: { type: 'string', description: 'PNG path to write. Missing directories are created.' },
+                fit: { type: 'boolean', description: 'Aim at the center of the target\'s active, enabled renderers and set the distance so their bounds fit the first view (5% margin). Overrides distance and focusOffset; the result reports fitDistance and fitFocusOffset. Hidden objects (hideObjects) are left out. Default false.' }
               }, VIEW_PROPERTIES),
               required: ['target', 'outputPath']
             }
