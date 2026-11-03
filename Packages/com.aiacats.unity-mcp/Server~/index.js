@@ -908,7 +908,7 @@ class ClaudeCodeMCPUnityServer {
           },
           {
             name: 'open_scene',
-            description: 'Opens a scene by its asset path.',
+            description: 'Opens a scene by its asset path. WARNING: by default, unsaved changes in the currently active scene are SAVED to its .unity file before switching (no dialog). Pass reloadFromDisk=true to drop them instead (e.g. after temporary edits for verification).',
             inputSchema: {
               type: 'object',
               properties: {
@@ -919,6 +919,10 @@ class ClaudeCodeMCPUnityServer {
                 additive: {
                   type: 'boolean',
                   description: 'Whether to open the scene additively (keeping current scene loaded). Default: false'
+                },
+                reloadFromDisk: {
+                  type: 'boolean',
+                  description: 'Discard unsaved changes of the active scene instead of saving them, and load scenePath from disk (also re-reads the same scene). Default: false (save first).'
                 }
               },
               required: ['scenePath']
