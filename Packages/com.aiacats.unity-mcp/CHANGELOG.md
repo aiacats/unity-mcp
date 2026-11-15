@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-15
+
+### Added
+- **`compile_player_scripts`** / `wait_for_player_scripts_done` / `get_player_scripts_status`: Player 向けにスクリプトだけをコンパイルする（`PlayerBuildInterface.CompilePlayerScripts`）。
+  シェーダーもシーンも作らないので `build_player` より速く、Editor のコンパイルが通っても Player だけ落ちる問題（Runtime asmdef の UnityEditor 依存など）を見つけられる。
+  - 引数: `target`（既定 StandaloneWindows64）・`development`（ScriptCompilationOptions.DevelopmentBuild）・`extraScriptingDefines`。
+  - 返り値: `success`・`assemblyCount`・`errors[{file,line,column,message,assembly}]`・`warningCount`・`otherErrors`（コンパイラ以外のエラーログ）・`durationMs`。
+  - メインスレッドを塞ぐ呼び出しで数十秒〜数分かかるため、`build_player` と同じく開始して返し、`wait_for_player_scripts_done`（既定 240 秒）で待つ。
+  - エラーは `CompilationPipeline.assemblyCompilationFinished` で集める（Unity 6000.3 / 2021.3 の EditorCompilation を逆コンパイルし、Player 向けでも呼ばれることを確かめた。実機の Unity ではまだ流していない）。
+    Bee が最新と判断したアセンブリ（`assembliesUpToDate`）はメッセージが来ないので、警告はコンパイルし直した分（`assembliesRecompiled`）だけ数える。
+  - 出力は `<project>/Temp/ClaudeCodeMCP/PlayerScripts`（毎回同じ場所。Bee の DAG が出力先ごとに作られるため）で、終わったら消す。
+  - 実行中の `assemblyCompilationFinished` は `get_compilation_errors`（Editor のコンパイル結果）に記録しない。
+
 ## [1.6.1] - 2026-11-04
 
 ### Added

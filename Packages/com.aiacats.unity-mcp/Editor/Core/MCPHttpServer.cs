@@ -50,6 +50,7 @@ namespace ClaudeCodeMCP.Editor.Core
         internal readonly TestRunState TestRunState = new TestRunState();
         internal readonly BuildState BuildState = new BuildState();
         internal readonly ExportState ExportState = new ExportState();
+        internal readonly PlayerScriptsState PlayerScriptsState = new PlayerScriptsState();
 
         // Request handlers
         private readonly Dictionary<string, IMCPHandler> _handlers = new Dictionary<string, IMCPHandler>();
@@ -180,6 +181,11 @@ namespace ClaudeCodeMCP.Editor.Core
             _handlers["/mcp/tools/build_player"] = new BuildPlayerHandler(this, BuildState);
             _handlers["/mcp/tools/wait_for_build_done"] = new WaitForBuildDoneHandler(this, BuildState);
             _handlers["/mcp/tools/get_build_status"] = new GetBuildStatusHandler(this, BuildState);
+
+            // Player 向けのスクリプトだけのコンパイル（build_player と同じ開始 / 待ちの形）
+            _handlers["/mcp/tools/compile_player_scripts"] = new CompilePlayerScriptsHandler(this, PlayerScriptsState, BuildState);
+            _handlers["/mcp/tools/wait_for_player_scripts_done"] = new WaitForPlayerScriptsDoneHandler(this, PlayerScriptsState);
+            _handlers["/mcp/tools/get_player_scripts_status"] = new GetPlayerScriptsStatusHandler(this, PlayerScriptsState);
 
             // .unitypackage export (async like the player build; compressing a large tree
             // takes longer than an MCP request will wait)
@@ -648,6 +654,8 @@ namespace ClaudeCodeMCP.Editor.Core
 
         private void OnAfterAssemblyReload(string assemblyName, CompilerMessage[] messages)
         {
+            // compile_player_scripts の実行中に来るのは Player 向けの結果。Editor のコンパイル結果（get_compilation_errors）に混ぜない
+            if (Handlers.PlayerScriptsState.IsCapturing) return;
             CompilationState.ProcessMessages(assemblyName, messages);
         }
 

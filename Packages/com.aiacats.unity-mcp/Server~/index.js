@@ -638,6 +638,56 @@ class ClaudeCodeMCPUnityServer {
             }
           },
           {
+            name: 'compile_player_scripts',
+            description: 'Compiles only the scripts for a Player target (PlayerBuildInterface.CompilePlayerScripts) - no shaders, no scenes, so it is much faster than build_player. Use it to find compile errors that only appear in Player builds even though the Editor compiles fine (e.g. a Runtime asmdef using UnityEditor, code outside #if UNITY_EDITOR). Starts asynchronously and returns immediately; follow it with wait_for_player_scripts_done. Output goes to <project>/Temp/ClaudeCodeMCP/PlayerScripts and is deleted afterwards. The result has success, assemblyCount, errors[{file,line,column,message,assembly}], warningCount, otherErrors (non-compiler errors logged during the run, e.g. asmdef setup errors) and durationMs. warningCount only covers assemblies that were actually recompiled (assembliesRecompiled); assemblies Bee considered up to date (assembliesUpToDate) report no warnings. Errors are always reported.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                target: {
+                  type: 'string',
+                  description: 'Unity BuildTarget enum name (e.g. StandaloneWindows64, StandaloneOSX, StandaloneLinux64, Android, iOS, WebGL). Default StandaloneWindows64. The platform module must be installed.'
+                },
+                development: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'If true, compiles with ScriptCompilationOptions.DevelopmentBuild (DEVELOPMENT_BUILD defined).'
+                },
+                extraScriptingDefines: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional extra scripting define symbols for this compile only (ScriptCompilationSettings.extraScriptingDefines).'
+                }
+              }
+            }
+          },
+          {
+            name: 'wait_for_player_scripts_done',
+            description: 'Blocks until the most recent compile_player_scripts finishes, then returns its result (timedOut=true if still running; call again to keep waiting). Use this instead of polling get_player_scripts_status.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeoutMs: {
+                  type: 'number',
+                  default: 240000,
+                  description: 'Maximum wait in ms. Default 240000 (stays under the 300 s HTTP response limit of this bridge).'
+                },
+                pollMs: {
+                  type: 'number',
+                  default: 500,
+                  description: 'Internal polling interval in milliseconds. Default 500.'
+                }
+              }
+            }
+          },
+          {
+            name: 'get_player_scripts_status',
+            description: 'Returns the state of the most recent compile_player_scripts (running flag and, once finished, the same result as wait_for_player_scripts_done). Use wait_for_player_scripts_done instead of polling this in a loop.',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
             name: 'export_package',
             description: 'Exports asset paths to a .unitypackage. Starts asynchronously and returns immediately - follow it with wait_for_export_done. Dependency collection is off by default so the package contains exactly what was asked for.',
             inputSchema: {
