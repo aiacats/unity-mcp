@@ -91,6 +91,8 @@ Scene ビュー左上に `MCP: ON` と表示されていれば正常です。
 |---------|------|--------------|
 | `hot_reload` | スクリプト再コンパイル | `saveAssets`, `optimized` |
 | `force_compilation` | 強制フルコンパイル | `forceUpdate` |
+| `compile_player_scripts` | Player 向けにスクリプトだけをコンパイル（シェーダーを作らないので速い）。Editor のコンパイルが通っても Player だけ落ちる問題を見つける。非同期で、`wait_for_player_scripts_done` で待つ | `target`（既定 StandaloneWindows64）, `development`, `extraScriptingDefines` |
+| `wait_for_player_scripts_done` / `get_player_scripts_status` | 結果を待つ / 状態を見る。成否・アセンブリ数・エラー一覧（ファイル・行・メッセージ）・警告数・時間 | `timeoutMs`（既定 240000） |
 | `screenshot` | Unity Editor ウィンドウ全体のスクリーンショット (Windows API) | `savePath` |
 
 ### モニタリング・デバッグ

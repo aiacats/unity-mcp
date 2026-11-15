@@ -149,6 +149,8 @@ Once installed, Claude Code can control Unity using natural language:
 
 - **hot_reload**: Trigger script recompilation
 - **force_compilation**: Force full compilation
+- **compile_player_scripts**: Compile only the scripts for a Player target (no shaders, so it is fast) to catch errors that only break Player builds while the Editor compiles fine
+- **wait_for_player_scripts_done** / **get_player_scripts_status**: Wait for / poll the result (success, assembly count, errors with file and line, warning count, duration)
 - **screenshot**: Capture entire Unity Editor window screenshot (Windows API)
 
 #### Monitoring & Debugging
